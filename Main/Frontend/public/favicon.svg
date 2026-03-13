@@ -1,0 +1,28 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="CineMatch favicon">
+  <defs>
+    <linearGradient id="cRedShine" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ff5b5b" />
+      <stop offset="55%" stop-color="#e11d48" />
+      <stop offset="100%" stop-color="#9f1239" />
+    </linearGradient>
+    <linearGradient id="mBlackShine" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fde68a" />
+      <stop offset="45%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#b45309" />
+    </linearGradient>
+    <filter id="softShadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.42" />
+    </filter>
+  </defs>
+
+  <!-- Transparent background + larger separated monogram -->
+  <!-- Square-style C (left, shiny red) -->
+  <path d="M31 10H18c-6.1 0-11 4.9-11 11v22c0 6.1 4.9 11 11 11h13v-8H20c-2.2 0-4-1.8-4-4V22c0-2.2 1.8-4 4-4h11z" fill="url(#cRedShine)" filter="url(#softShadow)" />
+
+  <!-- Bigger block M (right, shiny black) with extra spacing from C -->
+  <path d="M36 54V10h6l4 10 4-10h7v44h-7V32l-4 9-4-9v22z" fill="url(#mBlackShine)" stroke="#fef3c7" stroke-opacity="0.5" stroke-width="0.7" filter="url(#softShadow)" />
+
+  <!-- Gloss highlights -->
+  <path d="M20 14h9v3h-9z" fill="#ffffff" opacity="0.22" />
+  <path d="M39 14h16v2.5H39z" fill="#ffffff" opacity="0.18" />
+</svg>

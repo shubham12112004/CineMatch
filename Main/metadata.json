@@ -1,0 +1,5 @@
+{
+  "name": "CineMatch",
+  "description": "Smart Movie & Series Discovery Platform with Netflix-style UI and mood-based recommendations.",
+  "requestFramePermissions": []
+}
