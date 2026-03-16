@@ -51,6 +51,20 @@ const TermsOfService = lazy(() => import('./components/InfoPages/TermsOfService'
 const AboutPage = lazy(() => import('./components/InfoPages/AboutPage'));
 const ContactPage = lazy(() => import('./components/InfoPages/ContactPage'));
 
+function decodeBase64UrlJson(value) {
+  const normalized = String(value || '')
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+
+  const padding = normalized.length % 4;
+  const padded = padding ? normalized.padEnd(normalized.length + (4 - padding), '=') : normalized;
+  const binary = window.atob(padded);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  const decoded = new TextDecoder().decode(bytes);
+
+  return JSON.parse(decoded);
+}
+
 function OverlayFallback() {
   return (
     <div className="fixed inset-0 z-100 bg-black/80 backdrop-blur-sm flex items-center justify-center">
@@ -63,7 +77,7 @@ function OverlayFallback() {
 }
 
 export default function App() {
-    const isGlobalCountrySelection = (code) => code === 'GLOBAL' || code === 'RANDOM';
+  const isGlobalCountrySelection = (code) => code === 'GLOBAL' || code === 'RANDOM';
 
   // ===== ALL HOOKS MUST BE DECLARED FIRST (before any early returns) =====
 
@@ -72,6 +86,7 @@ export default function App() {
   const [showAuth, setShowAuth] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
+  const [authErrorMessage, setAuthErrorMessage] = useState('');
 
   // Content states
   const [selectedCountry, setSelectedCountry] = useState('IN');
@@ -153,6 +168,32 @@ export default function App() {
 
   // Check for stored token on mount
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const oauthToken = params.get('token');
+    const oauthUser = params.get('user');
+    const authError = params.get('authError');
+    const shouldShowAuth = params.get('showAuth') === '1';
+
+    if (oauthToken && oauthUser) {
+      try {
+        const decodedUser = decodeBase64UrlJson(oauthUser);
+        localStorage.setItem('token', oauthToken);
+        localStorage.setItem('user', JSON.stringify(decodedUser));
+        setCurrentUser(decodedUser);
+        setIsAuthenticated(true);
+        setShowAuth(false);
+        setAuthErrorMessage('');
+      } catch (err) {
+        localStorage.clear();
+        setShowAuth(true);
+        setAuthErrorMessage('Google sign-in returned invalid account data. Please try again.');
+      } finally {
+        window.history.replaceState({}, document.title, window.location.pathname);
+        setAuthLoading(false);
+      }
+      return;
+    }
+
     const token = localStorage.getItem('token');
     const user = localStorage.getItem('user');
     if (token && user) {
@@ -163,6 +204,16 @@ export default function App() {
         localStorage.clear();
       }
     }
+
+    if (authError) {
+      setShowAuth(true);
+      setAuthErrorMessage(authError);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (shouldShowAuth) {
+      setShowAuth(true);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     setAuthLoading(false);
   }, []);
 
@@ -447,6 +498,7 @@ export default function App() {
     setCurrentUser(user);
     setIsAuthenticated(true);
     setShowAuth(false);
+    setAuthErrorMessage('');
   };
 
   const handleLogout = () => {
@@ -905,7 +957,7 @@ export default function App() {
 
   // Show auth page if not authenticated and showing auth
   if (!isAuthenticated && showAuth) {
-    return <AuthPage onAuthSuccess={handleAuthSuccess} />;
+    return <AuthPage onAuthSuccess={handleAuthSuccess} initialError={authErrorMessage} />;
   }
 
   // ===== HELPER FUNCTIONS & CONSTANTS =====
