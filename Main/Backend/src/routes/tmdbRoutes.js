@@ -21,22 +21,25 @@ async function fetchWithTimeout(url, timeout = 30000) {
 export function createTmdbRouter(tmdbApiKey) {
   const router = Router();
 
-  router.get('/*', async (req, res) => {
-    if (!tmdbApiKey) {
-      return res.status(500).json({ error: 'TMDB_API_KEY is not configured' });
-    }
+  const buildTmdbUrl = (endpoint, query) => {
+    const queryParams = new URLSearchParams(query);
+    queryParams.set('api_key', tmdbApiKey);
+    return `https://api.themoviedb.org/3/${endpoint}?${queryParams.toString()}`;
+  };
 
-    const endpoint = req.params[0];
-    const queryParams = new URLSearchParams(req.query);
-    queryParams.append('api_key', tmdbApiKey);
-
-    const url = `https://api.tmdb.org/3/${endpoint}?${queryParams.toString()}`;
+  const proxyTmdb = async (endpoint, query, res) => {
+    const url = buildTmdbUrl(endpoint, query);
     const maxAttempts = 3;
 
     for (let attempts = 1; attempts <= maxAttempts; attempts += 1) {
       try {
         const response = await fetchWithTimeout(url);
         const data = await response.json();
+
+        if (!response.ok) {
+          return res.status(response.status).json(data);
+        }
+
         return res.json(data);
       } catch (error) {
         if (attempts >= maxAttempts) {
@@ -50,6 +53,24 @@ export function createTmdbRouter(tmdbApiKey) {
     }
 
     return res.status(500).json({ error: 'TMDB proxy failed unexpectedly' });
+  };
+
+  // Friendly default so /api/tmdb returns movie JSON instead of TMDB 404 for empty endpoint.
+  router.get('/', async (req, res) => {
+    if (!tmdbApiKey) {
+      return res.status(500).json({ error: 'TMDB_API_KEY is not configured' });
+    }
+
+    return proxyTmdb('discover/movie', req.query, res);
+  });
+
+  router.get('/*', async (req, res) => {
+    if (!tmdbApiKey) {
+      return res.status(500).json({ error: 'TMDB_API_KEY is not configured' });
+    }
+
+    const endpoint = req.params[0];
+    return proxyTmdb(endpoint, req.query, res);
   });
 
   return router;
