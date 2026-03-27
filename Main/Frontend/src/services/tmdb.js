@@ -1,5 +1,11 @@
 const API_URL = (import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '');
 const BASE_URL = API_URL ? `${API_URL}/api/tmdb` : '/api/tmdb';
+
+console.log('API URL:', import.meta.env.VITE_API_URL);
+if (!import.meta.env.VITE_API_URL && import.meta.env.PROD) {
+  console.warn('VITE_API_URL is missing in production. Requests may fail if frontend and backend are hosted separately.');
+}
+
 export const fetchFromTMDB = async (endpoint, params = {}, retries = 3) => {
   const queryParams = new URLSearchParams(params);
   const url = `${BASE_URL}/${endpoint}?${queryParams.toString()}`;

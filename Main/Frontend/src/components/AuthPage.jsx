@@ -13,6 +13,8 @@ const MOSAIC_COLORS = [
 const API_URL = (import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '');
 const buildApiUrl = (path) => (API_URL ? `${API_URL}${path}` : path);
 
+console.log('API URL:', import.meta.env.VITE_API_URL);
+
 export default function AuthPage({ onAuthSuccess, initialError = '' }) {
   const googleAuthEnabled = import.meta.env.VITE_GOOGLE_AUTH_ENABLED === 'true';
   const [isLogin, setIsLogin] = useState(true);
@@ -68,7 +70,11 @@ export default function AuthPage({ onAuthSuccess, initialError = '' }) {
       localStorage.setItem('user', JSON.stringify(data.user));
       onAuthSuccess(data.user, data.token);
     } catch (err) {
-      setError('Cannot connect to backend. Start the CineMatch server and try again.');
+      const isApiUrlMissing = !import.meta.env.VITE_API_URL;
+      const debugHint = isApiUrlMissing
+        ? 'VITE_API_URL is missing. Set it to your Render backend URL in Vercel env vars.'
+        : `Request failed for ${buildApiUrl('/api/auth/login')} or ${buildApiUrl('/api/auth/register')}.`;
+      setError(`Cannot connect to backend. ${debugHint}`);
       console.error('Auth error:', err);
       setLoading(false);
     }
