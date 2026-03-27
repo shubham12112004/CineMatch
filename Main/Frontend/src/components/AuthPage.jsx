@@ -10,6 +10,9 @@ const MOSAIC_COLORS = [
   '#1a0f0f','#080818','#101818','#180810','#0c1414',
 ];
 
+const API_URL = (import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '');
+const buildApiUrl = (path) => (API_URL ? `${API_URL}${path}` : path);
+
 export default function AuthPage({ onAuthSuccess, initialError = '' }) {
   const googleAuthEnabled = import.meta.env.VITE_GOOGLE_AUTH_ENABLED === 'true';
   const [isLogin, setIsLogin] = useState(true);
@@ -36,7 +39,7 @@ export default function AuthPage({ onAuthSuccess, initialError = '' }) {
     setError('');
 
     try {
-      const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+      const endpoint = buildApiUrl(isLogin ? '/api/auth/login' : '/api/auth/register');
       const payload = isLogin
         ? { email: formData.email, password: formData.password }
         : { name: formData.name, email: formData.email, password: formData.password };
@@ -74,7 +77,7 @@ export default function AuthPage({ onAuthSuccess, initialError = '' }) {
   // Redirects to the backend Google OAuth route (requires Passport.js setup)
   const handleGoogleSignIn = () => {
     if (!googleAuthEnabled) return;
-    window.location.href = '/api/auth/google';
+    window.location.href = buildApiUrl('/api/auth/google');
   };
 
   const inputClass =

@@ -1,4 +1,5 @@
-const BASE_URL = `${import.meta.env.VITE_BACKEND_URL}/api/tmdb`;
+const API_URL = (import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '');
+const BASE_URL = API_URL ? `${API_URL}/api/tmdb` : '/api/tmdb';
 export const fetchFromTMDB = async (endpoint, params = {}, retries = 3) => {
   const queryParams = new URLSearchParams(params);
   const url = `${BASE_URL}/${endpoint}?${queryParams.toString()}`;
