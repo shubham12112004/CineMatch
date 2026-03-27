@@ -11,12 +11,13 @@ export const fetchFromTMDB = async (endpoint, params = {}, retries = 3) => {
   const url = `${BASE_URL}/${endpoint}?${queryParams.toString()}`;
   
   for (let attempt = 1; attempt <= retries; attempt++) {
+    let timeoutId;
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
       const response = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeout);
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error(`TMDB Error: ${response.statusText}`);
@@ -25,7 +26,7 @@ export const fetchFromTMDB = async (endpoint, params = {}, retries = 3) => {
       const data = await response.json();
       return data;
     } catch (error) {
-      clearTimeout(timeout);
+      clearTimeout(timeoutId);
       
       if (attempt === retries) {
         console.error(`❌ TMDB fetch failed after ${retries} attempts:`, endpoint, error.message);
