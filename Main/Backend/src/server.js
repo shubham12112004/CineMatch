@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { connectDatabase, isMongoConnected } from './config/database.js';
 import {
   APP_URL,
+  CORS_ORIGINS,
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET,
   HOST,
@@ -35,6 +36,42 @@ async function startServer() {
 
   const app = express();
   const port = process.env.PORT || await findAvailablePort(REQUESTED_PORT, HOST);
+
+  const baseAllowedOrigins = [
+    APP_URL,
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:5173',
+    ...CORS_ORIGINS,
+  ].filter(Boolean);
+
+  const isOriginAllowed = (origin) => {
+    if (!origin) return true;
+    if (baseAllowedOrigins.includes(origin)) return true;
+
+    // Allow Vercel preview deployments like https://project-git-branch-user.vercel.app
+    if (origin.endsWith('.vercel.app')) return true;
+
+    return false;
+  };
+
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+
+    if (isOriginAllowed(origin)) {
+      res.header('Access-Control-Allow-Origin', origin || '*');
+      res.header('Vary', 'Origin');
+      res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+      res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+    }
+
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(204);
+    }
+
+    return next();
+  });
 
   app.use(express.json());
   app.use(passport.initialize());
