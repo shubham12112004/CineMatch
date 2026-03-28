@@ -76,6 +76,30 @@ async function startServer() {
   app.use(express.json());
   app.use(passport.initialize());
 
+  app.use('/api', (req, res, next) => {
+    const start = Date.now();
+    const origin = req.headers.origin || 'no-origin';
+
+    res.on('finish', () => {
+      const durationMs = Date.now() - start;
+      console.log(`[API] ${req.method} ${req.originalUrl} -> ${res.statusCode} (${durationMs}ms) origin=${origin}`);
+    });
+
+    next();
+  });
+
+  app.get('/api/health', (_req, res) => {
+    res.json({
+      ok: true,
+      service: 'CineMatch Backend',
+      env: NODE_ENV,
+      mongoConnected: isMongoConnected(),
+      tmdbConfigured: Boolean(TMDB_API_KEY),
+      appUrl: APP_URL,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
   /* ---------------- DATABASE ---------------- */
 
   await connectDatabase(MONGODB_URI);
