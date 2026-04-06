@@ -81,10 +81,10 @@ export default function App() {
 
   // ===== ALL HOOKS MUST BE DECLARED FIRST (before any early returns) =====
 
-  // Auth states
+  // Auth states - Login is now optional
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [authErrorMessage, setAuthErrorMessage] = useState('');
 
@@ -172,7 +172,6 @@ export default function App() {
     const oauthToken = params.get('token');
     const oauthUser = params.get('user');
     const authError = params.get('authError');
-    const shouldShowAuth = params.get('showAuth') === '1';
 
     if (oauthToken && oauthUser) {
       try {
@@ -185,12 +184,9 @@ export default function App() {
         setAuthErrorMessage('');
       } catch (err) {
         localStorage.clear();
-        setShowAuth(true);
         setAuthErrorMessage('Google sign-in returned invalid account data. Please try again.');
-      } finally {
-        window.history.replaceState({}, document.title, window.location.pathname);
-        setAuthLoading(false);
       }
+      window.history.replaceState({}, document.title, window.location.pathname);
       return;
     }
 
@@ -209,12 +205,7 @@ export default function App() {
       setShowAuth(true);
       setAuthErrorMessage(authError);
       window.history.replaceState({}, document.title, window.location.pathname);
-    } else if (shouldShowAuth) {
-      setShowAuth(true);
-      window.history.replaceState({}, document.title, window.location.pathname);
     }
-
-    setAuthLoading(false);
   }, []);
 
   // Save myList to localStorage
@@ -898,20 +889,10 @@ export default function App() {
 
   // ===== NOW WE CAN DO CONDITIONAL RENDERING =====
 
-  // Loading state
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-[#141414] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-300 font-bold uppercase tracking-widest text-xs">Loading CineMatch...</p>
-        </div>
-      </div>
-    );
-  }
+  // ===== NOW WE CAN DO CONDITIONAL RENDERING =====
 
-  // Content loading state (after auth)
-  if (isAuthenticated && contentLoading && !error) {
+  // Content loading state (show content while loading)
+  if (contentLoading) {
     return (
       <div className="min-h-screen bg-[#141414] text-white">
         <Navbar 
@@ -936,6 +917,7 @@ export default function App() {
           onLanguageChange={setSelectedLanguage}
           currentUser={currentUser}
           onLogout={handleLogout}
+          onLogin={() => setShowAuth(true)}
           notifications={notifications}
           onNotificationsOpen={markAllNotificationsRead}
         />
@@ -949,20 +931,6 @@ export default function App() {
       </div>
     );
   }
-
-  // Show landing page if not authenticated and not showing auth
-  if (!isAuthenticated && !showAuth) {
-    return <LandingPage onGetStarted={() => setShowAuth(true)} />;
-  }
-
-  // Show auth page if not authenticated and showing auth
-  if (!isAuthenticated && showAuth) {
-    return <AuthPage onAuthSuccess={handleAuthSuccess} initialError={authErrorMessage} />;
-  }
-
-  // ===== HELPER FUNCTIONS & CONSTANTS =====
-
-  // ===== MAIN COMPONENT RENDER =====
 
 
   return (
@@ -991,6 +959,7 @@ export default function App() {
         onLanguageChange={setSelectedLanguage}
         currentUser={currentUser}
         onLogout={handleLogout}
+        onLogin={() => setShowAuth(true)}
         notifications={notifications}
         onNotificationsOpen={markAllNotificationsRead}
       />
@@ -1249,6 +1218,20 @@ export default function App() {
         {infoPage === 'contact' && (
           <Suspense fallback={<OverlayFallback />}>
             <ContactPage onClose={() => setInfoPage(null)} />
+          </Suspense>
+        )}
+      </AnimatePresence>
+
+      {/* Optional Auth Modal */}
+      <AnimatePresence mode="wait">
+        {showAuth && (
+          <Suspense fallback={<OverlayFallback />}>
+            <AuthPage 
+              key="auth-page"
+              onAuthSuccess={handleAuthSuccess} 
+              initialError={authErrorMessage}
+              onClose={() => setShowAuth(false)}
+            />
           </Suspense>
         )}
       </AnimatePresence>

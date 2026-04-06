@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mail, Lock, User, Eye, EyeOff, Loader, AlertCircle, Clapperboard } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Loader, AlertCircle, Clapperboard, X } from 'lucide-react';
 
 // Cinematic poster-palette colours used for the background mosaic
 const MOSAIC_COLORS = [
@@ -15,7 +15,7 @@ const buildApiUrl = (path) => (API_URL ? `${API_URL}${path}` : path);
 
 console.log('API URL:', import.meta.env.VITE_API_URL);
 
-export default function AuthPage({ onAuthSuccess, initialError = '' }) {
+export default function AuthPage({ onAuthSuccess, initialError = '', onClose }) {
   const googleAuthEnabled = import.meta.env.VITE_GOOGLE_AUTH_ENABLED === 'true';
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -90,7 +90,34 @@ export default function AuthPage({ onAuthSuccess, initialError = '' }) {
     'w-full bg-[#1c1c1c] border border-white/10 focus:border-red-500/70 rounded-lg py-3 pl-10 pr-4 text-white text-sm placeholder-gray-600 focus:outline-none focus:bg-[#242424] transition-all duration-200';
 
   return (
-    <div className="min-h-[100dvh] relative flex items-center justify-center bg-black overflow-hidden">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+      className="fixed inset-0 z-100 flex items-center justify-center bg-black/70 backdrop-blur-sm overflow-y-auto"
+    >
+      {/* Close button */}
+      {onClose && (
+        <motion.button
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+          className="absolute top-4 right-4 z-50 p-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white transition-all"
+          title="Close"
+        >
+          <X size={20} />
+        </motion.button>
+      )}
+
+    <div
+      onClick={(e) => e.stopPropagation()}
+      className="relative min-h-screen md:min-h-auto flex items-center justify-center bg-black overflow-hidden">
 
       {/* ── Cinematic mosaic background ────────────────────────────────── */}
       <div
@@ -367,5 +394,6 @@ export default function AuthPage({ onAuthSuccess, initialError = '' }) {
         </p>
       </motion.div>
     </div>
+    </motion.div>
   );
 }

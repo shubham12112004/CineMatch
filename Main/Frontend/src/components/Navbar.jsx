@@ -5,7 +5,7 @@ import CustomSelect from './CustomSelect';
 import NavButton from './NavButton';
 import ProfileDropdown from './ProfileDropdown';
 
-export default function Navbar({ onSearch, onHome, onSurpriseMe, onSmartFinder, onPreferenceSearch, onCompare, onMyList, onSettings, onPreferences, onTheme, onAccount, onChat, onManageProfile, selectedCountry, onCountryChange, browseType = 'all', onBrowseTypeChange, selectedLanguage, onLanguageChange, currentUser, onLogout, notifications = [], onNotificationsOpen }) {
+export default function Navbar({ onSearch, onHome, onSurpriseMe, onSmartFinder, onPreferenceSearch, onCompare, onMyList, onSettings, onPreferences, onTheme, onAccount, onChat, onManageProfile, selectedCountry, onCountryChange, browseType = 'all', onBrowseTypeChange, selectedLanguage, onLanguageChange, currentUser, onLogout, onLogin, notifications = [], onNotificationsOpen }) {
   const isGlobalCountrySelection = (code) => code === 'GLOBAL' || code === 'RANDOM';
 
   const [query, setQuery] = useState('');
@@ -466,38 +466,42 @@ export default function Navbar({ onSearch, onHome, onSurpriseMe, onSmartFinder, 
               )}
             </div>
 
-            {/* User Profile with Gmail-Style Dropdown */}
+            {/* User Profile / Login Button */}
             <div className="relative shrink-0" ref={desktopProfileRef}>
-              <button
-                onClick={() => {
-                  if (currentUser) {
-                    setShowProfileMenu((prev) => !prev);
-                  } else if (onSettings) {
-                    onSettings();
-                  }
-                }}
-                className="w-10 h-10 bg-linear-to-br from-fuchsia-700/70 to-purple-700/70 border border-fuchsia-400/60 rounded-xl flex items-center justify-center text-white font-bold cursor-pointer hover:brightness-110 transition-all shadow-lg"
-                title={currentUser ? currentUser.name : 'Profile'}
-                aria-label="Profile"
-              >
-                {currentUser ? (
-                  currentUser.name?.charAt(0).toUpperCase()
-                ) : (
-                  <User size={18} className="text-fuchsia-100" />
-                )}
-              </button>
-              {currentUser && showProfileMenu && (
-                <ProfileDropdown 
-                  user={currentUser} 
-                  onClose={() => setShowProfileMenu(false)}
-                  onLogout={onLogout}
-                  onOpenManageProfile={onManageProfile}
-                  onOpenMyList={onMyList}
-                  onOpenPreferences={onPreferences || onSettings}
-                  onOpenTheme={onTheme || onSettings}
-                  onOpenAccount={onAccount || onSettings}
-                  onOpenChat={onChat}
-                />
+              {currentUser ? (
+                <>
+                  <button
+                    onClick={() => setShowProfileMenu((prev) => !prev)}
+                    className="w-10 h-10 bg-linear-to-br from-fuchsia-700/70 to-purple-700/70 border border-fuchsia-400/60 rounded-xl flex items-center justify-center text-white font-bold cursor-pointer hover:brightness-110 transition-all shadow-lg"
+                    title={currentUser.name}
+                    aria-label="Profile"
+                  >
+                    {currentUser.name?.charAt(0).toUpperCase()}
+                  </button>
+                  {showProfileMenu && (
+                    <ProfileDropdown 
+                      user={currentUser} 
+                      onClose={() => setShowProfileMenu(false)}
+                      onLogout={onLogout}
+                      onOpenManageProfile={onManageProfile}
+                      onOpenMyList={onMyList}
+                      onOpenPreferences={onPreferences || onSettings}
+                      onOpenTheme={onTheme || onSettings}
+                      onOpenAccount={onAccount || onSettings}
+                      onOpenChat={onChat}
+                    />
+                  )}
+                </>
+              ) : (
+                <button
+                  onClick={onLogin}
+                  className="px-4 h-10 bg-red-600 hover:bg-red-500 text-white font-bold text-sm rounded-xl flex items-center gap-2 transition-colors border border-red-500/50 shadow-lg"
+                  title="Login"
+                  aria-label="Login"
+                >
+                  <User size={16} />
+                  <span className="hidden sm:inline">Login</span>
+                </button>
               )}
             </div>
           </div>
@@ -697,11 +701,11 @@ export default function Navbar({ onSearch, onHome, onSurpriseMe, onSmartFinder, 
                     <button
                       onClick={() => {
                         setShowMobileMenu(false);
-                        if (onSettings) onSettings();
+                        if (onLogin) onLogin();
                       }}
-                      className="w-full h-10 rounded-xl border border-fuchsia-500/40 bg-fuchsia-900/20 text-fuchsia-200 text-sm font-semibold inline-flex items-center gap-2 px-3"
+                      className="w-full h-10 rounded-xl border border-red-500/40 bg-red-900/20 text-red-200 text-sm font-semibold inline-flex items-center gap-2 px-3"
                     >
-                      <User size={15} /> Account
+                      <User size={15} /> Login
                     </button>
                   )}
                 </div>
