@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx Backend/src/server.js",
+    "start": "node Backend/src/server.js",
     "build": "vite build --config Frontend/vite.config.js",
     "preview": "vite preview --config Frontend/vite.config.js",
     "clean": "rm -rf dist",
