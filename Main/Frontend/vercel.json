@@ -1,0 +1,10 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "env": {
+    "VITE_API_URL": "@vite_api_url",
+    "VITE_BACKEND_URL": "@vite_backend_url",
+    "VITE_GOOGLE_AUTH_ENABLED": "@vite_google_auth_enabled"
+  }
+}

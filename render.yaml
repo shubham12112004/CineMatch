@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: cinematch-backend
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install
+    startCommand: npm run dev
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: TMDB_API_KEY
+        fromDatabase:
+          name: TMDB_API_KEY
+      - key: MONGODB_URI
+        fromDatabase:
+          name: MONGODB_URI
+      - key: JWT_SECRET
+        fromDatabase:
+          name: JWT_SECRET
+      - key: GOOGLE_CLIENT_ID
+        fromDatabase:
+          name: GOOGLE_CLIENT_ID
+      - key: GOOGLE_CLIENT_SECRET
+        fromDatabase:
+          name: GOOGLE_CLIENT_SECRET
+      - key: GEMINI_API_KEY
+        fromDatabase:
+          name: GEMINI_API_KEY
+      - key: APP_URL
+        value: https://cinematch-6s53.onrender.com
+      - key: CORS_ORIGINS
+        value: https://*.vercel.app,https://cinematch-frontend.vercel.app
