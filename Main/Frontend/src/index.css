@@ -1,39 +1,41 @@
-@import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Cormorant+Garamond:wght@500;600;700&family=Nunito:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@500;600;700;800&display=swap');
 @import "tailwindcss";
 
 @layer base {
   :root {
-    --font-display: 'Cormorant Garamond', serif;
-    --font-body: 'Nunito', sans-serif;
-    --font-brand: 'Great Vibes', cursive;
+    --font-display: 'Montserrat', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    --font-brand: 'Montserrat', sans-serif;
+    --color-surface: #0b0f17;
+    --color-surface-elevated: rgba(15, 23, 42, 0.72);
+    --color-border: rgba(255, 255, 255, 0.08);
+    --color-accent: #e11d48;
   }
 
   html {
     scroll-behavior: smooth;
+    background: #05070b;
   }
 
   body {
-    @apply bg-[#141414] text-white;
+    @apply bg-[#05070b] text-white;
     font-family: var(--font-body);
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: none;
   }
 
   h1,
-  h2 {
+  h2,
+  h3,
+  h4 {
     font-family: var(--font-display);
-    letter-spacing: 0.02em;
+    letter-spacing: -0.03em;
   }
 
   .brand-font {
     font-family: var(--font-display);
-    letter-spacing: 0.03em;
-  }
-
-  .logo-font {
-    font-family: var(--font-brand);
-    letter-spacing: 0.01em;
-    text-transform: none;
+    letter-spacing: -0.04em;
   }
 
   /* Global curved button corners across the app */
@@ -45,7 +47,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid #dc2626;
+    outline: 2px solid #fb7185;
     outline-offset: 2px;
   }
 
@@ -57,6 +59,66 @@
 }
 
 @layer utilities {
+  .glass-panel {
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(2, 6, 23, 0.78));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(22px);
+  }
+
+  .premium-surface {
+    background:
+      radial-gradient(circle at top, rgba(255, 255, 255, 0.08), transparent 35%),
+      linear-gradient(180deg, rgba(5, 7, 11, 0.88), rgba(5, 7, 11, 0.96));
+  }
+
+  .section-shell {
+    max-width: 92rem;
+    margin-inline: auto;
+    padding-inline: 1rem;
+  }
+
+  .section-kicker {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.62);
+  }
+
+  .section-title {
+    font-size: clamp(1.5rem, 2vw, 2.75rem);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1;
+  }
+
+  .section-copy {
+    color: rgba(226, 232, 240, 0.72);
+    max-width: 52rem;
+    line-height: 1.65;
+  }
+
+  .nav-pill {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+    box-shadow: 0 10px 35px rgba(0, 0, 0, 0.25);
+  }
+
+  .card-lift {
+    transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+  }
+
+  .card-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 22px 50px rgba(0, 0, 0, 0.35);
+  }
+
+  .bottom-nav-safe {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
+  }
+
   @keyframes logo-float-glow {
     0%,
     100% {
@@ -224,5 +286,18 @@
   .theme-fx-pulse {
     background: radial-gradient(circle at center, rgba(220, 38, 38, 0.45), transparent 60%);
     animation: pulse-bg 3.2s ease-in-out infinite;
+  }
+
+  .hero-backdrop {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero-backdrop::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(2, 6, 23, 0.2), rgba(2, 6, 23, 0.86));
+    pointer-events: none;
   }
 }

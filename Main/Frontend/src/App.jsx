@@ -814,6 +814,10 @@ export default function App() {
   const displayLang = selectedLanguage === 'all' ? '' : ` (${getLanguageName(selectedLanguage)})`;
   const browseTypeLabel = browseType === 'movie' ? 'Movies' : browseType === 'series' ? 'Series' : browseType === 'drama' ? 'Drama' : 'All Content';
 
+  const continueWatchingMovies = myList.slice(0, 6).length > 0 ? myList.slice(0, 6) : trending.slice(0, 6);
+  const becauseYouWatchedMovies = [...topRated.slice(0, 6), ...popularTV.slice(0, 4)].slice(0, 10);
+  const moodPicks = [...countryDrama.slice(0, 4), ...countryAdventure.slice(0, 4), ...seriesThriller.slice(0, 4)].slice(0, 10);
+
   const movieSections = [
     { title: `Trending ${displayCountry} Movies${displayLang}`, movies: trending, isTV: false },
     { title: `${displayCountry} Action Movies${displayLang}`, movies: countryAction, isTV: false },
@@ -874,9 +878,9 @@ export default function App() {
   ];
 
   const themeBackgroundMap = {
-    default: 'bg-[#141414]',
-    ocean: 'bg-linear-to-br from-[#030712] via-[#0f172a] to-[#082f49]',
-    sunset: 'bg-linear-to-br from-[#1f0a0a] via-[#3b0827] to-[#451a03]'
+    default: 'premium-surface',
+    ocean: 'premium-surface bg-linear-to-br from-[#020617] via-[#0f172a] to-[#082f49]',
+    sunset: 'premium-surface bg-linear-to-br from-[#1f0a0a] via-[#31124d] to-[#451a03]'
   };
 
   const backgroundFxClass = backgroundFx === 'aurora'
@@ -934,7 +938,7 @@ export default function App() {
 
 
   return (
-    <div className={`min-h-screen text-white selection:bg-red-600 selection:text-white relative overflow-hidden ${themeBackgroundMap[themeMode] || themeBackgroundMap.default}`}>
+    <div className={`min-h-screen text-white selection:bg-red-500 selection:text-white relative overflow-hidden ${themeBackgroundMap[themeMode] || themeBackgroundMap.default}`}>
       {backgroundFxClass && <div className={`fixed inset-0 pointer-events-none z-0 ${backgroundFxClass}`} />}
       <div className="relative z-10">
       <Navbar 
@@ -972,7 +976,7 @@ export default function App() {
         />
       )}
       
-      <main className="pb-20">
+      <main className="pb-28">
         {error ? (
           <div className="pt-52 md:pt-40 px-4 text-center space-y-6">
             <div className="text-8xl mb-4">🎬</div>
@@ -1062,8 +1066,72 @@ export default function App() {
                 setHeroMovie(heroPool[idx]);
               }}
             />
+
+            <div className="section-shell -mt-10 md:-mt-14 relative z-30 pb-2">
+              <div className="grid gap-4 lg:grid-cols-[1.35fr_0.75fr]">
+                <div className="glass-panel rounded-[2rem] p-6 md:p-8">
+                  <p className="section-kicker">Retention hub</p>
+                  <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                    <div>
+                      <h2 className="section-title text-white">Continue where you left off.</h2>
+                      <p className="section-copy mt-3 text-sm md:text-base">
+                        Pick up saved titles, revisit the strongest matches, and keep your watchlist warm without hunting through clutter.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70">Continue Watching</span>
+                      <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70">Because You Watched</span>
+                      <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70">Mood Picks</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+                  <div className="glass-panel card-lift rounded-[2rem] p-5">
+                    <p className="section-kicker">AI assistant</p>
+                    <h3 className="mt-3 text-xl font-semibold text-white">Ask for a mood, genre, or runtime.</h3>
+                    <p className="mt-2 text-sm leading-6 text-white/55">The assistant can surface recommendations, build watchlists, and keep discovery feel personal.</p>
+                  </div>
+                  <div className="glass-panel card-lift rounded-[2rem] p-5">
+                    <p className="section-kicker">Monetization</p>
+                    <h3 className="mt-3 text-xl font-semibold text-white">Affiliate rails and sponsored rows.</h3>
+                    <p className="mt-2 text-sm leading-6 text-white/55">Keep recommendations clean while blending in premium links to major OTT platforms.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <MovieRow
+              title="Continue Watching"
+              eyebrow="Home base"
+              description="Resume saved titles and unfinished trailers from where users left off."
+              movies={continueWatchingMovies}
+              onMovieClick={handleMovieClick}
+              onToggleList={toggleMyList}
+              myList={myList}
+            />
+
+            <MovieRow
+              title="Because You Watched"
+              eyebrow="Personalized"
+              description="A stable recommendation rail that rewards prior intent and improves retention."
+              movies={becauseYouWatchedMovies}
+              onMovieClick={handleMovieClick}
+              onToggleList={toggleMyList}
+              myList={myList}
+            />
+
+            <MovieRow
+              title="Mood Picks"
+              eyebrow="AI-assisted"
+              description="Fast paths for the way people actually browse: by mood, time, and energy level."
+              movies={moodPicks}
+              onMovieClick={handleMovieClick}
+              onToggleList={toggleMyList}
+              myList={myList}
+            />
             
-            <div className="-mt-20 relative z-30 space-y-12">
+            <div className="mt-6 relative z-30 space-y-8">
               {browseType !== 'all' && (
                 <div className="px-4 md:px-12 pt-2">
                   <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/8 border border-white/10 rounded-full text-sm font-bold uppercase tracking-widest text-gray-200 backdrop-blur-sm">

@@ -1,71 +1,136 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, Bell, Shuffle, MessageSquare, Globe, Mic, TrendingUp, User, Home, List, Layers, Sparkles, Menu, X } from 'lucide-react';
-import { fetchFromTMDB, POSTER_BASE_URL } from '../services/tmdb';
-import CustomSelect from './CustomSelect';
-import NavButton from './NavButton';
-import ProfileDropdown from './ProfileDropdown';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Bell,
+  Film,
+  Home,
+  List,
+  Menu,
+  MessageSquare,
+  Mic,
+  MoonStar,
+  Search,
+  Shuffle,
+  Sparkles,
+  User,
+  X,
+  Clapperboard,
+  SlidersHorizontal,
+  Tv,
+  PlaySquare,
+  WandSparkles,
+  ChevronDown,
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { fetchFromTMDB } from '../services/tmdb';
 
-export default function Navbar({ onSearch, onHome, onSurpriseMe, onSmartFinder, onPreferenceSearch, onCompare, onMyList, onSettings, onPreferences, onTheme, onAccount, onChat, onManageProfile, selectedCountry, onCountryChange, browseType = 'all', onBrowseTypeChange, selectedLanguage, onLanguageChange, currentUser, onLogout, onLogin, notifications = [], onNotificationsOpen }) {
-  const isGlobalCountrySelection = (code) => code === 'GLOBAL' || code === 'RANDOM';
-
+export default function Navbar({
+  onSearch,
+  onHome,
+  onSurpriseMe,
+  onSmartFinder,
+  onPreferenceSearch,
+  onCompare,
+  onMyList,
+  onSettings,
+  onPreferences,
+  onTheme,
+  onAccount,
+  onChat,
+  onManageProfile,
+  selectedCountry,
+  onCountryChange,
+  browseType = 'all',
+  onBrowseTypeChange,
+  selectedLanguage,
+  onLanguageChange,
+  currentUser,
+  onLogout,
+  onLogin,
+  notifications = [],
+  onNotificationsOpen,
+}) {
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+
   const desktopSearchRef = useRef(null);
   const mobileSearchRef = useRef(null);
   const desktopProfileRef = useRef(null);
+  const moreMenuRef = useRef(null);
   const notificationRef = useRef(null);
+
+  const unreadCount = notifications.filter((item) => !item.read).length;
+
+  const quickTabs = useMemo(() => ([
+    { key: 'all', label: 'Home', icon: Home, action: onHome },
+    { key: 'movie', label: 'Movies', icon: Film, action: () => onBrowseTypeChange?.('movie') },
+    { key: 'series', label: 'TV Shows', icon: Tv, action: () => onBrowseTypeChange?.('series') },
+    { key: 'list', label: 'My List', icon: List, action: onMyList },
+  ]), [onBrowseTypeChange, onHome, onMyList]);
+
+  useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 24);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      const isInsideDesktopSearch = desktopSearchRef.current?.contains(event.target);
-      const isInsideMobileSearch = mobileSearchRef.current?.contains(event.target);
-      if (!isInsideDesktopSearch && !isInsideMobileSearch) {
+      if (desktopSearchRef.current && !desktopSearchRef.current.contains(event.target)) {
         setShowSuggestions(false);
       }
 
-      const isInsideDesktopProfile = desktopProfileRef.current?.contains(event.target);
-      if (!isInsideDesktopProfile) {
+      if (mobileSearchRef.current && !mobileSearchRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+
+      if (desktopProfileRef.current && !desktopProfileRef.current.contains(event.target)) {
         setShowProfileMenu(false);
+      }
+
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target)) {
+        setShowMoreMenu(false);
       }
 
       if (notificationRef.current && !notificationRef.current.contains(event.target)) {
         setShowNotifications(false);
       }
     };
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   useEffect(() => {
-    if (showMobileMenu) {
+    if (showMobileMenu || showMobileSearch) {
       document.body.style.overflow = 'hidden';
       return () => {
         document.body.style.overflow = '';
       };
     }
+
     document.body.style.overflow = '';
-  }, [showMobileMenu]);
+    return undefined;
+  }, [showMobileMenu, showMobileSearch]);
 
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth >= 768) {
         setShowMobileMenu(false);
+        setShowMobileSearch(false);
       }
     };
+
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-
-  useEffect(() => {
-    if (!showMobileMenu) {
-      setShowNotifications(false);
-    }
-  }, [showMobileMenu]);
 
   useEffect(() => {
     const fetchSuggestions = async () => {
@@ -76,56 +141,29 @@ export default function Navbar({ onSearch, onHome, onSurpriseMe, onSmartFinder, 
       }
 
       try {
-        const countryLanguageMap = {
-          IN: ['hi', 'ta', 'te', 'kn', 'ml', 'pa', 'bn'],
-          PK: ['ur', 'pa', 'sd'],
-          TR: ['tr'],
-          US: ['en', 'es'],
-          GB: ['en'],
-          KR: ['ko'],
-          JP: ['ja'],
-        };
-
-        const countryCode = isGlobalCountrySelection(selectedCountry) ? '' : selectedCountry;
-        const langSet = new Set((countryLanguageMap[countryCode] || []).map((l) => l.toLowerCase()));
-        const isLocalMatch = (item) => {
-          if (!countryCode) return true;
-          const originCountries = Array.isArray(item.origin_country) ? item.origin_country : [];
-          const originalLang = String(item.original_language || '').toLowerCase();
-          return originCountries.includes(countryCode) || langSet.has(originalLang);
-        };
-
-        const data = await fetchFromTMDB('search/multi', { 
-          query, 
+        const data = await fetchFromTMDB('search/multi', {
+          query,
           language: selectedLanguage === 'all' ? 'en-US' : selectedLanguage,
-          region: countryCode,
-          include_adult: false
+          region: selectedCountry === 'GLOBAL' ? '' : selectedCountry,
+          include_adult: false,
         });
-        const filteredResults = (data.results || []).filter(item => item.media_type === 'movie' || item.media_type === 'tv');
-        const prioritized = countryCode && selectedLanguage === 'all'
-          ? [...filteredResults.filter(isLocalMatch), ...filteredResults.filter((item) => !isLocalMatch(item))]
-          : filteredResults;
 
-        const strictCountryOnly = countryCode
-          ? prioritized.filter(isLocalMatch)
-          : prioritized;
-
-        setSuggestions(strictCountryOnly.slice(0, 6));
+        const items = (data.results || []).filter((item) => item.media_type === 'movie' || item.media_type === 'tv');
+        setSuggestions(items.slice(0, 5));
         setShowSuggestions(true);
-      } catch (err) {
-        console.error('Failed to fetch suggestions', err);
+      } catch (error) {
+        console.error('Search suggestions failed', error);
       }
     };
 
-    const debounce = setTimeout(fetchSuggestions, 300);
+    const debounce = setTimeout(fetchSuggestions, 250);
     return () => clearTimeout(debounce);
   }, [query, selectedLanguage, selectedCountry]);
-  const [isListening, setIsListening] = useState(false);
 
   const startVoiceSearch = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert("Voice recognition not supported in this browser.");
+      alert('Voice search is not supported in this browser.');
       return;
     }
 
@@ -141,108 +179,16 @@ export default function Navbar({ onSearch, onHome, onSurpriseMe, onSmartFinder, 
       onSearch(transcript);
     };
 
-    recognition.onerror = () => {
-      setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
   };
-
-  const countries = [
-    { code: 'IN', name: 'India' },
-    { code: 'PK', name: 'Pakistan' },
-    { code: 'TR', name: 'Turkey' },
-    { code: 'US', name: 'USA' },
-    { code: 'GB', name: 'UK' },
-    { code: 'KR', name: 'S. Korea' },
-    { code: 'JP', name: 'Japan' },
-    { code: 'GLOBAL', name: 'Global' },
-  ];
-
-  const browseTypeOptions = [
-    { value: 'all', label: 'All Content', shortLabel: 'All' },
-    { value: 'movie', label: 'Movies', shortLabel: 'Mov' },
-    { value: 'series', label: 'Series', shortLabel: 'Ser' },
-    { value: 'drama', label: 'Drama', shortLabel: 'Dra' },
-  ];
-
-  const languagesMap = {
-    'IN': [
-      { code: 'hi', name: 'Hindi' },
-      { code: 'ta', name: 'Tamil' },
-      { code: 'te', name: 'Telugu' },
-      { code: 'kn', name: 'Kannada' },
-      { code: 'ml', name: 'Malayalam' },
-      { code: 'pa', name: 'Punjabi' },
-      { code: 'bn', name: 'Bengali' },
-    ],
-    'PK': [
-      { code: 'ur', name: 'Urdu' },
-      { code: 'pa', name: 'Punjabi' },
-      { code: 'sd', name: 'Sindhi' },
-    ],
-    'TR': [
-      { code: 'tr', name: 'Turkish' },
-    ],
-    'US': [
-      { code: 'en', name: 'English' },
-      { code: 'es', name: 'Spanish' },
-    ],
-    'GB': [
-      { code: 'en', name: 'English' },
-    ],
-    'KR': [
-      { code: 'ko', name: 'Korean' },
-    ],
-    'JP': [
-      { code: 'ja', name: 'Japanese' },
-    ],
-  };
-
-  const currentLanguages = languagesMap[selectedCountry] || [];
-
-  const allLanguageOptions = [
-    ...Object.values(languagesMap).flat()
-  ].reduce((acc, item) => {
-    if (!acc.find(lang => lang.code === item.code)) {
-      acc.push(item);
-    }
-    return acc;
-  }, []);
-
-  const languageOptions = [
-    { value: 'all', label: 'All Languages', shortLabel: 'Lan' },
-    ...((isGlobalCountrySelection(selectedCountry) ? allLanguageOptions : currentLanguages).map((lang) => ({
-      value: lang.code,
-      label: lang.name,
-      shortLabel: String(lang.name).slice(0, 3)
-    })))
-  ];
-
-  useEffect(() => {
-    const isValidLanguage = languageOptions.some(lang => lang.value === selectedLanguage);
-    if (!isValidLanguage) {
-      onLanguageChange('all');
-    }
-  }, [selectedCountry, selectedLanguage, onLanguageChange, languageOptions]);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
 
   const handleSearch = (e) => {
     if (e) e.preventDefault();
-    if (query.trim()) {
-      onSearch(query);
-      setShowSuggestions(false);
-      setQuery('');
-    }
+    if (!query.trim()) return;
+    onSearch(query);
+    setQuery('');
+    setShowSuggestions(false);
   };
 
   const handleSuggestionClick = (suggestion) => {
@@ -250,10 +196,23 @@ export default function Navbar({ onSearch, onHome, onSurpriseMe, onSmartFinder, 
     setQuery(title);
     onSearch(title);
     setShowSuggestions(false);
-    setQuery('');
   };
 
-  const unreadCount = notifications.filter(item => !item.read).length;
+  const browseMenu = [
+    { label: 'All content', value: 'all', description: 'Overview rail' },
+    { label: 'Movies', value: 'movie', description: 'Films only' },
+    { label: 'TV Shows', value: 'series', description: 'Series only' },
+    { label: 'Drama', value: 'drama', description: 'Story-first picks' },
+  ];
+
+  const moreActions = [
+    { label: 'Smart Finder', icon: Sparkles, action: onSmartFinder, tone: 'text-violet-200' },
+    { label: 'Compare Titles', icon: SlidersHorizontal, action: onCompare, tone: 'text-amber-200' },
+    { label: 'AI Chat', icon: MessageSquare, action: onChat, tone: 'text-cyan-200' },
+    { label: 'Surprise Me', icon: Shuffle, action: onSurpriseMe, tone: 'text-emerald-200' },
+    { label: 'Recommendations', icon: WandSparkles, action: onPreferenceSearch, tone: 'text-pink-200' },
+    { label: 'Settings', icon: MoonStar, action: () => onSettings?.(), tone: 'text-slate-200' },
+  ];
 
   const timeAgo = (isoDate) => {
     const time = new Date(isoDate).getTime();
@@ -267,154 +226,149 @@ export default function Navbar({ onSearch, onHome, onSurpriseMe, onSmartFinder, 
     return `${days}d ago`;
   };
 
+  const setBrowseAndClose = (value) => {
+    onBrowseTypeChange?.(value);
+    setShowMobileMenu(false);
+    setShowMoreMenu(false);
+    onHome?.();
+  };
+
   return (
-    <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${
-      isScrolled 
-        ? 'bg-black/70 backdrop-blur-lg border-b border-white/10 shadow-xl' 
-        : 'bg-linear-to-b from-black/90 via-black/60 to-transparent'
-    }`}>
-      <div className="px-4 md:px-6 lg:px-8 py-3 md:py-4">
-        {/* Desktop Layout - Single Unified Row */}
-        <div className="hidden md:flex items-center min-w-0">
-          {/* Left Section - Logo + Navigation */}
-          <div className="flex items-center min-w-0 flex-1">
-            {/* Logo */}
-            <h1
-              onClick={onHome}
-              className="logo-font logo-rainbow-glow -ml-1 shrink-0 cursor-pointer text-5xl md:text-6xl leading-none transition-transform hover:scale-105"
-              aria-label="Go to home"
-            >
-              CineMatch
-            </h1>
+    <nav
+      className={`fixed top-0 inset-x-0 z-50 transition-all duration-500 ${
+        isScrolled ? 'bg-black/72 backdrop-blur-2xl border-b border-white/8 shadow-[0_12px_50px_rgba(0,0,0,0.38)]' : 'bg-linear-to-b from-black/88 via-black/55 to-transparent'
+      }`}
+    >
+      <div className="section-shell">
+        <div className="hidden md:flex items-center gap-4 py-4">
+          <button
+            onClick={onHome}
+            className="flex items-center gap-3 shrink-0"
+            aria-label="Go to home"
+          >
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/5 border border-white/10 shadow-lg">
+              <Clapperboard size={22} className="text-red-400" />
+            </span>
+            <span className="text-2xl font-black tracking-[-0.06em] text-white">
+              Cine<span className="text-red-400">Match</span>
+            </span>
+          </button>
 
-            <div className="flex items-center gap-2 min-w-0 flex-1 justify-center px-2">
-              {/* Navigation Buttons */}
-              <div className="flex items-center gap-2 min-w-0 max-w-[58vw] overflow-x-auto no-scrollbar pr-1">
-                <NavButton onClick={onHome} icon={Home} colorTheme="red">
-                  Home
-                </NavButton>
-                <NavButton onClick={onMyList} icon={List} colorTheme="emerald">
-                  My List
-                </NavButton>
-                <NavButton onClick={onSmartFinder} icon={Sparkles} colorTheme="violet">
-                  Smart Finder
-                </NavButton>
-                <NavButton onClick={onCompare} icon={Layers} colorTheme="amber">
-                  Compare
-                </NavButton>
-                <NavButton onClick={onChat} icon={MessageSquare} colorTheme="gray" variant="highlight">
-                  AI Chat
-                </NavButton>
-                <NavButton onClick={onSurpriseMe} icon={Shuffle} colorTheme="cyan">
-                  Surprise Me
-                </NavButton>
-              </div>
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            {quickTabs.map(({ key, label, icon: Icon, action }) => (
+              <button
+                key={key}
+                onClick={action}
+                className={`nav-pill inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white/82 transition-all hover:bg-white/8 hover:text-white ${browseType === key ? 'border-white/20 bg-white/10 text-white' : ''}`}
+              >
+                <Icon size={15} className={browseType === key ? 'text-red-300' : 'text-white/60'} />
+                {label}
+              </button>
+            ))}
 
-              {/* Country & Language Selectors */}
-              <div className="flex items-center gap-2 shrink-0">
-                <CustomSelect
-                  options={browseTypeOptions}
-                  value={browseType}
-                  onChange={onBrowseTypeChange}
-                  placeholder="Type"
-                  buttonLabel="Type"
-                  colorTheme="red"
-                  buttonWidth="w-20"
+            <div className="relative ml-2 min-w-0 flex-1 max-w-[34rem]" ref={desktopSearchRef}>
+              <form onSubmit={handleSearch} className="nav-pill flex h-12 items-center gap-3 rounded-full px-4">
+                <Search size={16} className="text-white/45" />
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search movies, shows, cast..."
+                  onFocus={() => query.length >= 2 && setShowSuggestions(true)}
+                  className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder:text-white/35 outline-none"
                 />
+                <button type="button" onClick={startVoiceSearch} className="text-white/55 transition-colors hover:text-white" title="Voice search">
+                  <Mic size={16} className={isListening ? 'animate-pulse text-red-300' : ''} />
+                </button>
+              </form>
 
-                <CustomSelect
-                  options={countries.map(c => ({ value: c.code, label: c.name }))}
-                  value={selectedCountry}
-                  onChange={onCountryChange}
-                  placeholder="Country"
-                  colorTheme="emerald"
-                  icon={Globe}
-                  buttonWidth="w-24"
-                />
-
-                <CustomSelect
-                  options={languageOptions}
-                  value={selectedLanguage}
-                  onChange={onLanguageChange}
-                  placeholder="Lan"
-                  buttonLabel="Lan"
-                  colorTheme="violet"
-                  buttonWidth="w-20"
-                />
-              </div>
-            </div>
-          </div>
-          {/* Right Section - Search, Notifications, Profile */}
-          <div className="ml-4 -mr-0.5 flex items-center gap-2 shrink-0">
-            {/* Smart Search */}
-            <div className="relative shrink-0" ref={desktopSearchRef}>
-              <div className="relative">
-                <form onSubmit={handleSearch} className="h-10 flex items-center bg-black/85 backdrop-blur-md border border-cyan-500/45 px-2.5 rounded-xl shadow-xl transition-all duration-300">
-                  <Search size={16} className="mr-2 text-gray-400" />
-                  <input
-                    type="text"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    onFocus={() => query.length >= 2 && setShowSuggestions(true)}
-                    placeholder="Search titles..."
-                    className="bg-transparent outline-none text-sm w-56 text-white placeholder:text-gray-500"
-                  />
-                  <Mic 
-                    size={16} 
-                    className={`cursor-pointer transition-colors ${isListening ? 'text-red-600 animate-pulse' : 'text-gray-400 hover:text-white'}`} 
-                    onClick={startVoiceSearch}
-                    title="Voice Search"
-                  />
-                </form>
-
-                {/* Enhanced Suggestions Dropdown */}
+              <AnimatePresence>
                 {showSuggestions && suggestions.length > 0 && (
-                  <div className="absolute top-full left-0 w-full mt-2 bg-[#1a1a1a] border border-white/10 rounded-lg shadow-2xl overflow-hidden z-100 backdrop-blur-xl">
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    className="absolute top-full left-0 right-0 mt-2 overflow-hidden rounded-3xl border border-white/10 bg-slate-950/95 shadow-2xl backdrop-blur-xl"
+                  >
                     {suggestions.map((item) => (
-                      <div 
+                      <button
                         key={item.id}
                         onClick={() => handleSuggestionClick(item)}
-                        className="flex items-center gap-3 p-3 hover:bg-white/5 cursor-pointer transition-all border-b border-white/5 last:border-0 group"
+                        className="flex w-full items-center gap-3 border-b border-white/5 px-4 py-3 text-left transition-colors hover:bg-white/5 last:border-0"
                       >
-                        <div className="w-12 h-16 shrink-0 bg-gray-800 rounded overflow-hidden relative">
-                          {item.poster_path ? (
-                            <img 
-                              src={`${POSTER_BASE_URL}${item.poster_path}`} 
-                              alt="" 
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform"
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-xs text-gray-600">No Img</div>
-                          )}
+                        <div className="h-14 w-10 overflow-hidden rounded-xl bg-white/5" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-white">{item.title || item.name}</p>
+                          <p className="text-xs text-white/45">{item.media_type?.toUpperCase() || 'TITLE'} • {item.release_date?.split('-')[0] || item.first_air_date?.split('-')[0] || 'N/A'}</p>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-white truncate group-hover:text-red-500 transition-colors">
-                            {item.title || item.name}
-                          </p>
-                          <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
-                            <span className="uppercase font-semibold">{item.media_type}</span>
-                            <span>•</span>
-                            <span>{item.release_date?.split('-')[0] || item.first_air_date?.split('-')[0] || 'N/A'}</span>
-                            {item.vote_average > 0 && (
-                              <>
-                                <span>•</span>
-                                <span className="flex items-center gap-1 text-yellow-500">
-                                  <TrendingUp size={12} />
-                                  {item.vote_average.toFixed(1)}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+                      </button>
                     ))}
-                  </div>
+                  </motion.div>
                 )}
-              </div>
+              </AnimatePresence>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="relative" ref={moreMenuRef}>
+              <button
+                onClick={() => setShowMoreMenu((prev) => !prev)}
+                className="nav-pill inline-flex h-12 items-center gap-2 rounded-full px-4 text-sm font-semibold text-white/85"
+              >
+                <Menu size={16} />
+                More
+                <ChevronDown size={14} className="text-white/55" />
+              </button>
+
+              <AnimatePresence>
+                {showMoreMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -10, scale: 0.98 }}
+                    className="absolute right-0 top-full mt-2 w-[22rem] overflow-hidden rounded-3xl border border-white/10 bg-slate-950/96 shadow-2xl backdrop-blur-2xl"
+                  >
+                    <div className="border-b border-white/8 px-4 py-3">
+                      <p className="text-xs font-bold uppercase tracking-[0.28em] text-white/50">Advanced tools</p>
+                    </div>
+                    <div className="grid gap-2 p-3">
+                      {moreActions.map(({ label, icon: Icon, action, tone }) => (
+                        <button
+                          key={label}
+                          onClick={() => {
+                            action?.();
+                            setShowMoreMenu(false);
+                          }}
+                          className="flex items-center gap-3 rounded-2xl border border-white/6 bg-white/[0.03] px-4 py-3 text-left transition-all hover:border-white/12 hover:bg-white/[0.06]"
+                        >
+                          <span className={`flex h-10 w-10 items-center justify-center rounded-2xl bg-white/5 ${tone}`}>
+                            <Icon size={18} />
+                          </span>
+                          <span>
+                            <span className="block text-sm font-semibold text-white">{label}</span>
+                            <span className="block text-xs text-white/45">Open the modal or assistant</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 border-t border-white/8 p-3">
+                      {browseMenu.map((item) => (
+                        <button
+                          key={item.value}
+                          onClick={() => setBrowseAndClose(item.value)}
+                          className={`rounded-2xl px-4 py-3 text-left transition-all ${browseType === item.value ? 'bg-white/10 text-white' : 'bg-white/[0.03] text-white/80 hover:bg-white/[0.06]'}`}
+                        >
+                          <span className="block text-sm font-semibold">{item.label}</span>
+                          <span className="block text-xs text-white/45">{item.description}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
-            {/* Notifications */}
             <div className="relative" ref={notificationRef}>
               <button
                 onClick={() => {
@@ -424,294 +378,293 @@ export default function Navbar({ onSearch, onHome, onSurpriseMe, onSmartFinder, 
                     return next;
                   });
                 }}
-                className="w-10 h-10 flex items-center justify-center bg-amber-900/35 border border-amber-500/50 text-amber-200 hover:bg-amber-800/45 hover:border-amber-400/80 rounded-xl transition-all relative shadow-lg"
+                className="nav-pill relative inline-flex h-12 w-12 items-center justify-center rounded-full text-white"
                 title="Notifications"
               >
-                <Bell size={16} className="text-amber-200" />
-                {/* Notification Badge */}
+                <Bell size={16} />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 bg-red-600 rounded-full text-[10px] text-white font-bold flex items-center justify-center">
+                  <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
               </button>
-              {showNotifications && (
-                <div className="absolute top-full right-0 mt-2 w-80 bg-[#1a1a1a] border border-white/10 rounded-lg shadow-2xl z-100 overflow-hidden backdrop-blur-xl">
-                  <div className="px-4 py-3 border-b border-white/10 bg-linear-to-r from-red-600/10 to-purple-600/10">
-                    <p className="text-sm font-bold text-white">Notifications</p>
-                  </div>
-                  <div className="max-h-80 overflow-y-auto">
-                    {notifications.length > 0 ? (
-                      notifications.map((item) => (
-                        <button
-                          key={item.id}
-                          onClick={() => {
-                            setShowNotifications(false);
-                            onMyList();
-                          }}
-                          className="w-full text-left px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors"
-                        >
-                          <p className="text-sm font-semibold text-white">{item.title}</p>
-                          <p className="text-xs text-gray-300 mt-1 line-clamp-2">{item.message}</p>
-                          <p className="text-[11px] text-gray-500 mt-1">{timeAgo(item.createdAt)}</p>
-                        </button>
-                      ))
-                    ) : (
-                      <div className="px-4 py-8 text-center text-sm text-gray-400">
-                        No notifications yet
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
 
-            {/* User Profile / Login Button */}
-            <div className="relative shrink-0" ref={desktopProfileRef}>
-              {currentUser ? (
-                <>
-                  <button
-                    onClick={() => setShowProfileMenu((prev) => !prev)}
-                    className="w-10 h-10 bg-linear-to-br from-fuchsia-700/70 to-purple-700/70 border border-fuchsia-400/60 rounded-xl flex items-center justify-center text-white font-bold cursor-pointer hover:brightness-110 transition-all shadow-lg"
-                    title={currentUser.name}
-                    aria-label="Profile"
+              <AnimatePresence>
+                {showNotifications && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute right-0 top-full mt-2 w-80 overflow-hidden rounded-3xl border border-white/10 bg-slate-950/96 shadow-2xl backdrop-blur-2xl"
                   >
-                    {currentUser.name?.charAt(0).toUpperCase()}
-                  </button>
-                  {showProfileMenu && (
-                    <ProfileDropdown 
-                      user={currentUser} 
-                      onClose={() => setShowProfileMenu(false)}
-                      onLogout={onLogout}
-                      onOpenManageProfile={onManageProfile}
-                      onOpenMyList={onMyList}
-                      onOpenPreferences={onPreferences || onSettings}
-                      onOpenTheme={onTheme || onSettings}
-                      onOpenAccount={onAccount || onSettings}
-                      onOpenChat={onChat}
-                    />
-                  )}
-                </>
-              ) : (
-                <button
-                  onClick={onLogin}
-                  className="px-4 h-10 bg-red-600 hover:bg-red-500 text-white font-bold text-sm rounded-xl flex items-center gap-2 transition-colors border border-red-500/50 shadow-lg"
-                  title="Login"
-                  aria-label="Login"
-                >
-                  <User size={16} />
-                  <span className="hidden sm:inline">Login</span>
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile Layout */}
-        <div className="md:hidden pb-1">
-          <div className="flex items-center justify-between gap-2">
-            <h1
-              onClick={onHome}
-              className="logo-font logo-rainbow-glow cursor-pointer text-4xl leading-none transition-transform hover:scale-105"
-              aria-label="Go to home"
-            >
-              CineMatch
-            </h1>
-            <button
-              type="button"
-              onClick={() => setShowMobileMenu(true)}
-              className="h-10 w-10 inline-flex items-center justify-center rounded-xl border border-white/20 bg-black/55 text-white"
-              aria-label="Open menu"
-            >
-              <Menu size={18} />
-            </button>
-          </div>
-
-          {showMobileMenu && (
-            <>
-              <div className="fixed inset-0 z-70 bg-black/70" onClick={() => setShowMobileMenu(false)} />
-              <aside className="fixed right-0 top-0 z-80 h-screen w-[min(90vw,22rem)] overflow-y-auto border-l border-white/15 bg-[#0c0d10] p-4 shadow-2xl">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-lg font-bold text-white">Menu</h2>
-                  <button
-                    type="button"
-                    onClick={() => setShowMobileMenu(false)}
-                    className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/5 text-white"
-                    aria-label="Close menu"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-
-                <div className="relative mb-3" ref={mobileSearchRef}>
-                  <form onSubmit={handleSearch} className="h-10 flex items-center bg-black/85 backdrop-blur-md border border-cyan-500/45 px-2.5 rounded-xl shadow-xl transition-all duration-300">
-                    <Search size={16} className="mr-2 text-gray-400" />
-                    <input
-                      type="text"
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      onFocus={() => query.length >= 2 && setShowSuggestions(true)}
-                      placeholder="Search titles..."
-                      className="bg-transparent outline-none text-sm flex-1 text-white placeholder:text-gray-500"
-                    />
-                    <Mic
-                      size={16}
-                      className={`cursor-pointer transition-colors ${isListening ? 'text-red-600 animate-pulse' : 'text-gray-400 hover:text-white'}`}
-                      onClick={startVoiceSearch}
-                      title="Voice Search"
-                    />
-                  </form>
-
-                  {showSuggestions && suggestions.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-[#1a1a1a] border border-white/10 rounded-lg shadow-2xl overflow-hidden z-90 backdrop-blur-xl">
-                      {suggestions.map((item) => (
-                        <div
-                          key={item.id}
-                          onClick={() => handleSuggestionClick(item)}
-                          className="flex items-center gap-3 p-3 hover:bg-white/5 cursor-pointer transition-all border-b border-white/5 last:border-0"
-                        >
-                          <div className="w-10 h-14 shrink-0 bg-gray-800 rounded overflow-hidden relative">
-                            {item.poster_path ? (
-                              <img
-                                src={`${POSTER_BASE_URL}${item.poster_path}`}
-                                alt=""
-                                className="w-full h-full object-cover"
-                                referrerPolicy="no-referrer"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-600">No Img</div>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-white truncate">{item.title || item.name}</p>
-                            <p className="text-[11px] text-gray-400 mt-1">{item.release_date?.split('-')[0] || item.first_air_date?.split('-')[0] || 'N/A'}</p>
-                          </div>
-                        </div>
-                      ))}
+                    <div className="border-b border-white/8 px-4 py-3">
+                      <p className="text-sm font-semibold text-white">Notifications</p>
                     </div>
-                  )}
-                </div>
-
-                <div className="space-y-2 mb-4">
-                  <button onClick={() => { onHome(); setShowMobileMenu(false); }} className="w-full h-10 rounded-xl border border-red-500/40 bg-red-900/20 text-red-200 text-sm font-semibold inline-flex items-center gap-2 px-3">
-                    <Home size={15} /> Home
-                  </button>
-                  <button onClick={() => { onMyList(); setShowMobileMenu(false); }} className="w-full h-10 rounded-xl border border-emerald-500/40 bg-emerald-900/20 text-emerald-200 text-sm font-semibold inline-flex items-center gap-2 px-3">
-                    <List size={15} /> My List
-                  </button>
-                  <button onClick={() => { onSurpriseMe(); setShowMobileMenu(false); }} className="w-full h-10 rounded-xl border border-cyan-500/40 bg-cyan-900/20 text-cyan-200 text-sm font-semibold inline-flex items-center gap-2 px-3">
-                    <Shuffle size={15} /> Surprise Me
-                  </button>
-                  <button onClick={() => { onSmartFinder(); setShowMobileMenu(false); }} className="w-full h-10 rounded-xl border border-violet-500/40 bg-violet-900/20 text-violet-200 text-sm font-semibold inline-flex items-center gap-2 px-3">
-                    <Sparkles size={15} /> Smart Finder
-                  </button>
-                  <button onClick={() => { onCompare(); setShowMobileMenu(false); }} className="w-full h-10 rounded-xl border border-amber-500/40 bg-amber-900/20 text-amber-200 text-sm font-semibold inline-flex items-center gap-2 px-3">
-                    <Layers size={15} /> Compare
-                  </button>
-                  <button onClick={() => { onChat(); setShowMobileMenu(false); }} className="w-full h-10 rounded-xl border border-red-500/40 bg-red-900/20 text-red-200 text-sm font-semibold inline-flex items-center gap-2 px-3">
-                    <MessageSquare size={15} /> AI Chat
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 gap-2 mb-4">
-                  <CustomSelect
-                    options={browseTypeOptions}
-                    value={browseType}
-                    onChange={onBrowseTypeChange}
-                    placeholder="Type"
-                    buttonLabel="Type"
-                    colorTheme="red"
-                    buttonWidth="w-full"
-                    buttonClassName="h-10 text-xs"
-                    menuClassName="left-0"
-                  />
-                  <CustomSelect
-                    options={countries.map(c => ({ value: c.code, label: c.name }))}
-                    value={selectedCountry}
-                    onChange={onCountryChange}
-                    placeholder="Country"
-                    colorTheme="emerald"
-                    icon={Globe}
-                    buttonWidth="w-full"
-                    buttonClassName="h-10 text-xs"
-                    menuClassName="left-0"
-                  />
-                  <CustomSelect
-                    options={languageOptions}
-                    value={selectedLanguage}
-                    onChange={onLanguageChange}
-                    placeholder="Language"
-                    buttonLabel="Language"
-                    colorTheme="violet"
-                    buttonWidth="w-full"
-                    buttonClassName="h-10 text-xs"
-                    menuClassName="left-0"
-                  />
-                </div>
-
-                <div className="space-y-2" ref={notificationRef}>
-                  <button
-                    onClick={() => {
-                      setShowNotifications((prev) => {
-                        const next = !prev;
-                        if (next && onNotificationsOpen) onNotificationsOpen();
-                        return next;
-                      });
-                    }}
-                    className="w-full h-10 rounded-xl border border-amber-500/40 bg-amber-900/20 text-amber-200 text-sm font-semibold inline-flex items-center justify-between px-3"
-                  >
-                    <span className="inline-flex items-center gap-2"><Bell size={15} /> Notifications</span>
-                    {unreadCount > 0 && <span className="text-xs">{unreadCount > 9 ? '9+' : unreadCount}</span>}
-                  </button>
-                  {showNotifications && (
-                    <div className="max-h-56 overflow-y-auto rounded-xl border border-white/10 bg-black/35">
+                    <div className="max-h-80 overflow-y-auto">
                       {notifications.length > 0 ? (
                         notifications.map((item) => (
                           <button
                             key={item.id}
                             onClick={() => {
                               setShowNotifications(false);
-                              setShowMobileMenu(false);
-                              onMyList();
+                              onMyList?.();
                             }}
-                            className="w-full text-left px-3 py-2.5 border-b border-white/5 hover:bg-white/5 transition-colors"
+                            className="w-full border-b border-white/5 px-4 py-3 text-left transition-colors hover:bg-white/5 last:border-0"
                           >
                             <p className="text-sm font-semibold text-white">{item.title}</p>
-                            <p className="text-xs text-gray-300 mt-1 line-clamp-2">{item.message}</p>
-                            <p className="text-[11px] text-gray-500 mt-1">{timeAgo(item.createdAt)}</p>
+                            <p className="mt-1 line-clamp-2 text-xs text-white/55">{item.message}</p>
+                            <p className="mt-1 text-[11px] text-white/35">{timeAgo(item.createdAt)}</p>
                           </button>
                         ))
                       ) : (
-                        <div className="px-3 py-6 text-center text-sm text-gray-400">No notifications yet</div>
+                        <div className="px-4 py-8 text-center text-sm text-white/40">No notifications yet</div>
                       )}
                     </div>
-                  )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
-                  {currentUser ? (
+            <div className="relative" ref={desktopProfileRef}>
+              {currentUser ? (
+                <>
+                  <button
+                    onClick={() => setShowProfileMenu((prev) => !prev)}
+                    className="nav-pill flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-sm font-bold text-white"
+                    title={currentUser.name}
+                    aria-label="Profile"
+                  >
+                    {currentUser.name?.charAt(0).toUpperCase()}
+                  </button>
+                  <AnimatePresence>
+                    {showProfileMenu && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="absolute right-0 top-full mt-2 w-72 overflow-hidden rounded-3xl border border-white/10 bg-slate-950/96 shadow-2xl backdrop-blur-2xl"
+                      >
+                        <div className="px-4 py-4 border-b border-white/8">
+                          <p className="text-sm font-semibold text-white">{currentUser.name}</p>
+                          <p className="text-xs text-white/45">{currentUser.email || 'Your account'}</p>
+                        </div>
+                        <div className="grid gap-1 p-2">
+                          {[
+                            ['Profile & Settings', onManageProfile],
+                            ['My List', onMyList],
+                            ['Preferences', onPreferences || onSettings],
+                            ['Theme', onTheme || onSettings],
+                            ['Account', onAccount || onSettings],
+                            ['AI Chat', onChat],
+                          ].map(([label, action]) => (
+                            <button
+                              key={label}
+                              onClick={() => {
+                                action?.();
+                                setShowProfileMenu(false);
+                              }}
+                              className="rounded-2xl px-4 py-3 text-left text-sm text-white/82 transition-colors hover:bg-white/5"
+                            >
+                              {label}
+                            </button>
+                          ))}
+                          <button
+                            onClick={() => {
+                              onLogout?.();
+                              setShowProfileMenu(false);
+                            }}
+                            className="rounded-2xl px-4 py-3 text-left text-sm font-semibold text-red-300 transition-colors hover:bg-red-500/10"
+                          >
+                            Logout
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </>
+              ) : (
+                <button
+                  onClick={onLogin}
+                  className="nav-pill inline-flex h-12 items-center gap-2 rounded-full bg-red-500/90 px-4 text-sm font-semibold text-white hover:bg-red-500"
+                >
+                  <User size={16} />
+                  Login
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="md:hidden py-3">
+          <div className="flex items-center justify-between gap-3">
+            <button onClick={onHome} className="flex items-center gap-3" aria-label="Go to home">
+              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/5 border border-white/10">
+                <Clapperboard size={18} className="text-red-400" />
+              </span>
+              <span className="text-xl font-black tracking-[-0.06em] text-white">
+                Cine<span className="text-red-400">Match</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowMobileMenu(true)}
+              className="nav-pill inline-flex h-11 w-11 items-center justify-center rounded-full text-white"
+              aria-label="Open menu"
+            >
+              <Menu size={18} />
+            </button>
+          </div>
+
+          <div className="mt-3 flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+            {quickTabs.map(({ key, label, icon: Icon, action }) => (
+              <button
+                key={`mobile-${key}`}
+                onClick={action}
+                className="nav-pill inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold text-white/80 whitespace-nowrap"
+              >
+                <Icon size={14} />
+                {label}
+              </button>
+            ))}
+            <button onClick={() => setShowMobileSearch(true)} className="nav-pill inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold text-white/80 whitespace-nowrap">
+              <Search size={14} /> Search
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {showMobileMenu && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-70 bg-black/72 backdrop-blur-sm md:hidden"
+          >
+            <div className="absolute inset-x-0 bottom-0 rounded-t-[1.5rem] border-t border-white/10 bg-slate-950 p-4 bottom-nav-safe">
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.28em] text-white/45">CineMatch</p>
+                  <h2 className="text-lg font-semibold text-white">Quick actions</h2>
+                </div>
+                <button onClick={() => setShowMobileMenu(false)} className="nav-pill inline-flex h-10 w-10 items-center justify-center rounded-full text-white">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => { onHome?.(); setShowMobileMenu(false); }} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-semibold text-white">Home</button>
+                <button onClick={() => { onMyList?.(); setShowMobileMenu(false); }} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-semibold text-white">My List</button>
+                <button onClick={() => { onSmartFinder?.(); setShowMobileMenu(false); }} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-semibold text-white">Smart Finder</button>
+                <button onClick={() => { onChat?.(); setShowMobileMenu(false); }} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-semibold text-white">AI Chat</button>
+                <button onClick={() => { onCompare?.(); setShowMobileMenu(false); }} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-semibold text-white">Compare</button>
+                <button onClick={() => { onSurpriseMe?.(); setShowMobileMenu(false); }} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-semibold text-white">Surprise Me</button>
+              </div>
+
+              <div className="mt-3 grid gap-2">
+                {browseMenu.map((item) => (
+                  <button
+                    key={item.value}
+                    onClick={() => setBrowseAndClose(item.value)}
+                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-semibold text-white"
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button onClick={() => { onLogin?.(); setShowMobileMenu(false); }} className="rounded-2xl border border-red-500/20 bg-red-500/12 px-4 py-3 text-left text-sm font-semibold text-red-200">
+                  {currentUser ? 'Profile' : 'Login'}
+                </button>
+                <button onClick={() => { onNotificationsOpen?.(); setShowNotifications((prev) => !prev); setShowMobileMenu(false); }} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-semibold text-white">
+                  Notifications
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showMobileSearch && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-80 bg-black/75 backdrop-blur-sm md:hidden"
+          >
+            <div className="absolute inset-x-0 top-0 p-4 pt-5">
+              <div ref={mobileSearchRef} className="glass-panel rounded-3xl p-3">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.28em] text-white/45">Search</p>
+                    <h2 className="text-lg font-semibold text-white">Find a title</h2>
+                  </div>
+                  <button onClick={() => setShowMobileSearch(false)} className="nav-pill inline-flex h-10 w-10 items-center justify-center rounded-full text-white">
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <form onSubmit={handleSearch} className="nav-pill flex h-12 items-center gap-3 rounded-full px-4">
+                  <Search size={16} className="text-white/45" />
+                  <input
+                    autoFocus
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search movies, shows, cast..."
+                    className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder:text-white/35 outline-none"
+                  />
+                  <button type="button" onClick={startVoiceSearch} className="text-white/55 transition-colors hover:text-white">
+                    <Mic size={16} className={isListening ? 'animate-pulse text-red-300' : ''} />
+                  </button>
+                </form>
+
+                <div className="mt-3 grid gap-2 max-h-[60vh] overflow-y-auto custom-scrollbar pr-1">
+                  {showSuggestions && suggestions.length > 0 ? suggestions.map((item) => (
                     <button
+                      key={item.id}
                       onClick={() => {
-                        setShowMobileMenu(false);
-                        if (onManageProfile) onManageProfile();
+                        handleSuggestionClick(item);
+                        setShowMobileSearch(false);
                       }}
-                      className="w-full h-10 rounded-xl border border-fuchsia-500/40 bg-fuchsia-900/20 text-fuchsia-200 text-sm font-semibold inline-flex items-center gap-2 px-3"
+                      className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-left"
                     >
-                      <User size={15} /> Profile & Settings
+                      <div className="h-14 w-10 rounded-xl bg-white/5" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-white">{item.title || item.name}</p>
+                        <p className="text-xs text-white/45">{item.release_date?.split('-')[0] || item.first_air_date?.split('-')[0] || 'N/A'}</p>
+                      </div>
                     </button>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        setShowMobileMenu(false);
-                        if (onLogin) onLogin();
-                      }}
-                      className="w-full h-10 rounded-xl border border-red-500/40 bg-red-900/20 text-red-200 text-sm font-semibold inline-flex items-center gap-2 px-3"
-                    >
-                      <User size={15} /> Login
-                    </button>
+                  )) : (
+                    <p className="px-1 py-10 text-center text-sm text-white/40">Type at least 2 characters to search.</p>
                   )}
                 </div>
-              </aside>
-            </>
-          )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="md:hidden fixed bottom-0 inset-x-0 z-50 border-t border-white/10 bg-black/80 backdrop-blur-2xl bottom-nav-safe">
+        <div className="grid grid-cols-5 gap-1 px-2 pt-2">
+          {[
+            { label: 'Home', icon: Home, action: onHome },
+            { label: 'Movies', icon: Film, action: () => onBrowseTypeChange?.('movie') },
+            { label: 'TV', icon: Tv, action: () => onBrowseTypeChange?.('series') },
+            { label: 'Search', icon: Search, action: () => setShowMobileSearch(true) },
+            { label: 'More', icon: Menu, action: () => setShowMobileMenu(true) },
+          ].map(({ label, icon: Icon, action }) => (
+            <button
+              key={label}
+              onClick={action}
+              className="flex flex-col items-center justify-center gap-1 rounded-2xl py-2 text-[11px] font-semibold text-white/65 transition-colors hover:text-white"
+            >
+              <Icon size={18} />
+              {label}
+            </button>
+          ))}
         </div>
       </div>
     </nav>

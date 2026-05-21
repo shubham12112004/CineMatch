@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Play, Plus, ThumbsUp, ChevronDown, Star, Check, Film } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import { Film, Play, Plus, Star, Check, ThumbsUp, ChevronDown } from 'lucide-react';
 import { POSTER_BASE_URL, getMovieVideos, getTVVideos, GENRE_MAP } from '../services/tmdb';
 
 export default function MovieCard({ movie, onClick, isTV: isTVProp = false, onToggleList, isInList }) {
@@ -10,198 +10,200 @@ export default function MovieCard({ movie, onClick, isTV: isTVProp = false, onTo
   const [imgError, setImgError] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
 
-  const posterUrl = movie.poster_path 
-    ? `${POSTER_BASE_URL}${movie.poster_path}` 
+  const posterUrl = movie.poster_path
+    ? `${POSTER_BASE_URL}${movie.poster_path}`
     : (movie.backdrop_path ? `${POSTER_BASE_URL}${movie.backdrop_path}` : null);
 
-  const backdropUrl = movie.backdrop_path 
-    ? `${POSTER_BASE_URL}${movie.backdrop_path}` 
+  const backdropUrl = movie.backdrop_path
+    ? `${POSTER_BASE_URL}${movie.backdrop_path}`
     : (movie.poster_path ? `${POSTER_BASE_URL}${movie.poster_path}` : null);
 
-  const fallbackUrl = 'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=500&q=80';
+  const fallbackUrl = 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=800&q=80';
 
-  const primaryGenre = movie.genre_ids && movie.genre_ids.length > 0 
-    ? GENRE_MAP[movie.genre_ids[0]] 
-    : (movie.genres && movie.genres.length > 0 ? movie.genres[0].name : null);
+  const primaryGenre = useMemo(() => {
+    if (movie.genre_ids?.length > 0) return GENRE_MAP[movie.genre_ids[0]];
+    if (movie.genres?.length > 0) return movie.genres[0].name;
+    return null;
+  }, [movie.genre_ids, movie.genres]);
 
   useEffect(() => {
     let timeout;
+
     if (isHovered) {
       timeout = setTimeout(async () => {
         try {
           const fetchFn = isTV ? getTVVideos : getMovieVideos;
           const data = await fetchFn(movie.id);
-          const trailer = data.results.find(v => v.type === 'Trailer' && v.site === 'YouTube');
+          const trailer = data.results.find((video) => video.type === 'Trailer' && video.site === 'YouTube');
           if (trailer) setTrailerKey(trailer.key);
-        } catch (err) {
-          console.error('Failed to fetch trailer', err);
+        } catch (error) {
+          console.error('Failed to fetch trailer', error);
         }
-      }, 500);
+      }, 350);
     } else {
       setTrailerKey(null);
     }
+
     return () => clearTimeout(timeout);
   }, [isHovered, movie.id, isTV]);
 
-  const handleAction = (e, action) => {
-    e.stopPropagation();
+  const handleAction = (event, action) => {
+    event.stopPropagation();
+
     if (action === 'play' || action === 'more') {
       onClick(movie, isTV ? 'tv' : 'movie');
     } else if (action === 'list') {
       onToggleList(movie);
     } else if (action === 'like') {
-      setIsLiked(!isLiked);
+      setIsLiked((prev) => !prev);
     }
   };
 
+  const year = movie.release_date?.split('-')[0] || movie.first_air_date?.split('-')[0] || '—';
+  const rating = typeof movie.vote_average === 'number' ? movie.vote_average.toFixed(1) : '—';
+
   return (
-    <div 
-      className="relative shrink-0 w-40 md:w-60 h-60 md:h-90 cursor-pointer group"
+    <motion.article
+      whileHover={{ y: -8 }}
+      transition={{ duration: 0.22 }}
+      className="group relative shrink-0 w-44 md:w-56 lg:w-64 cursor-pointer"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={() => onClick(movie, isTV ? 'tv' : 'movie')}
     >
-      <div className="w-full h-full bg-gray-900 rounded-lg overflow-hidden relative shadow-xl">
-        <motion.img
-          src={!imgError && posterUrl ? posterUrl : fallbackUrl}
-          alt={movie.title || movie.name}
-          className="w-full h-full object-cover rounded-lg"
-          referrerPolicy="no-referrer"
-          loading="lazy"
-          onError={() => setImgError(true)}
-        />
-        {(!posterUrl && !imgError) && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center bg-linear-to-br from-gray-900 via-gray-800 to-gray-900 backdrop-blur-sm">
-            <Film className="text-gray-600 mb-2" size={40} />
-            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest leading-tight">
-              {movie.title || movie.name}
-            </p>
+      <div className="relative overflow-hidden rounded-[1.35rem] border border-white/8 bg-white/[0.03] shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
+        <div className="relative aspect-[2/3] w-full overflow-hidden bg-slate-900">
+          <motion.img
+            src={!imgError && posterUrl ? posterUrl : fallbackUrl}
+            alt={movie.title || movie.name}
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+            referrerPolicy="no-referrer"
+            loading="lazy"
+            onError={() => setImgError(true)}
+          />
+
+          {(!posterUrl && !imgError) && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-linear-to-br from-slate-900 via-slate-950 to-slate-900 p-4 text-center">
+              <Film className="text-white/15" size={40} />
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/45">{movie.title || movie.name}</p>
+            </div>
+          )}
+
+          <div className="absolute inset-0 bg-linear-to-t from-black/88 via-black/18 to-transparent" />
+          <div className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 bg-linear-to-br from-red-500/14 via-transparent to-cyan-400/12" />
+
+          <div className="absolute left-3 top-3 flex items-center gap-2">
+            <span className="rounded-full border border-white/12 bg-black/45 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white/80 backdrop-blur-md">
+              {isTV ? 'Series' : 'Movie'}
+            </span>
           </div>
-        )}
-        
-        {/* Card Glow Effect on Hover */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: isHovered ? 1 : 0 }}
-          className="absolute inset-0 bg-linear-to-t from-red-600/30 via-purple-600/20 to-transparent rounded-lg pointer-events-none"
-        />
+
+          <div className="absolute right-3 top-3 flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 rounded-full bg-black/50 px-2.5 py-1 text-[10px] font-bold text-yellow-200 backdrop-blur-md">
+              <Star size={10} className="fill-current" />
+              {rating}
+            </span>
+          </div>
+
+          <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-white">{movie.title || movie.name}</p>
+              <p className="text-xs text-white/55">{year}</p>
+            </div>
+            {primaryGenre && (
+              <span className="shrink-0 rounded-full border border-white/10 bg-white/8 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/75 backdrop-blur-md">
+                {primaryGenre}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="absolute inset-x-0 bottom-0 h-1 bg-linear-to-r from-transparent via-red-500/50 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
       </div>
 
-      <AnimatePresence mode="wait">
+      <AnimatePresence>
         {isHovered && (
           <motion.div
-            initial={{ scale: 0.9, opacity: 0, y: 0 }}
-            animate={{ scale: 1.2, opacity: 1, y: -50 }}
-            exit={{ scale: 0.9, opacity: 0, y: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className="absolute inset-0 z-50 bg-[#1a1a1a] rounded-lg shadow-[0_0_30px_rgba(220,38,38,0.5),0_20px_50px_rgba(0,0,0,0.9)] overflow-hidden border border-red-600/30"
+            initial={{ opacity: 0, y: 18, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.98 }}
+            transition={{ type: 'spring', stiffness: 280, damping: 26 }}
+            className="absolute left-0 right-0 top-0 z-40 overflow-hidden rounded-[1.35rem] border border-white/10 bg-slate-950/96 shadow-[0_30px_80px_rgba(0,0,0,0.75)] backdrop-blur-xl"
           >
-            <div className="h-44 w-full relative bg-black">
+            <div className="relative aspect-[16/9] bg-black">
               {trailerKey ? (
                 <>
                   <iframe
                     src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&mute=1&controls=0&loop=1&playlist=${trailerKey}&rel=0&modestbranding=1`}
-                    className="w-full h-full pointer-events-none"
+                    className="h-full w-full pointer-events-none"
                     allow="autoplay"
+                    title={`${movie.title || movie.name} trailer preview`}
                   />
-                  {/* Trailer Overlay Gradient */}
-                  <div className="absolute inset-0 bg-linear-to-t from-[#1a1a1a] via-transparent to-transparent pointer-events-none" />
+                  <div className="absolute inset-0 bg-linear-to-t from-slate-950 via-transparent to-transparent" />
                 </>
               ) : (
-                <div className="relative w-full h-full bg-linear-to-br from-gray-900 to-black">
+                <>
                   <img
                     src={backdropUrl || fallbackUrl}
-                    className="w-full h-full object-cover opacity-50"
+                    className="h-full w-full object-cover opacity-60"
                     referrerPolicy="no-referrer"
+                    alt=""
                   />
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                    <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/42">
+                    <div className="h-10 w-10 rounded-full border-2 border-white/20 border-t-white/70 animate-spin" />
                   </div>
-                </div>
+                </>
               )}
             </div>
-            
-            <div className="p-4 space-y-3 bg-linear-to-b from-[#1a1a1a] to-[#0a0a0a]">
-              <div className="flex items-center justify-between">
+
+            <div className="space-y-3 p-4">
+              <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <motion.button 
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={(e) => handleAction(e, 'play')}
-                    aria-label="Play details"
-                    className="w-9 h-9 rounded-full bg-white flex items-center justify-center hover:bg-gray-200 transition-all shadow-lg"
+                  <button
+                    onClick={(event) => handleAction(event, 'play')}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-black transition-transform hover:scale-105"
+                    aria-label="Open details"
                   >
-                    <Play size={16} fill="black" className="ml-0.5" />
-                  </motion.button>
-                  <motion.button 
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={(e) => handleAction(e, 'list')}
+                    <Play size={16} fill="currentColor" />
+                  </button>
+                  <button
+                    onClick={(event) => handleAction(event, 'list')}
+                    className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-all ${isInList ? 'border-red-400/40 bg-red-500/18 text-red-100' : 'border-white/12 bg-white/6 text-white/75 hover:bg-white/10'}`}
                     aria-label={isInList ? 'Remove from list' : 'Add to list'}
-                    className={`w-9 h-9 rounded-full border-2 flex items-center justify-center transition-all shadow-lg ${
-                      isInList 
-                        ? 'bg-red-600 border-red-600 text-white shadow-red-600/50' 
-                        : 'border-gray-500 text-gray-300 hover:border-white hover:bg-white/10'
-                    }`}
-                    title={isInList ? "Remove from List" : "Add to List"}
                   >
                     {isInList ? <Check size={16} /> : <Plus size={16} />}
-                  </motion.button>
-                  <motion.button 
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={(e) => handleAction(e, 'like')}
-                    aria-label={isLiked ? 'Unlike content' : 'Like content'}
-                    className={`w-9 h-9 rounded-full border-2 flex items-center justify-center transition-all shadow-lg ${
-                      isLiked 
-                        ? 'bg-white border-white text-black' 
-                        : 'border-gray-500 text-gray-300 hover:border-white hover:bg-white/10'
-                    }`}
+                  </button>
+                  <button
+                    onClick={(event) => handleAction(event, 'like')}
+                    className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-all ${isLiked ? 'border-white/20 bg-white text-black' : 'border-white/12 bg-white/6 text-white/75 hover:bg-white/10'}`}
+                    aria-label={isLiked ? 'Unlike' : 'Like'}
                   >
-                    <ThumbsUp size={16} fill={isLiked ? "black" : "none"} />
-                  </motion.button>
+                    <ThumbsUp size={16} fill={isLiked ? 'currentColor' : 'none'} />
+                  </button>
                 </div>
-                <motion.button 
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={(e) => handleAction(e, 'more')}
+
+                <button
+                  onClick={(event) => handleAction(event, 'more')}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/12 bg-white/6 text-white/75 hover:bg-white/10"
                   aria-label="More details"
-                  className="w-9 h-9 rounded-full border-2 border-gray-500 flex items-center justify-center text-gray-300 hover:border-white hover:bg-white/10 transition-all shadow-lg"
                 >
                   <ChevronDown size={16} />
-                </motion.button>
+                </button>
               </div>
 
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-green-400 font-bold bg-green-900/30 px-2 py-0.5 rounded">
-                    {Math.round(movie.vote_average * 10)}% Match
-                  </span>
-                  <span className="text-gray-400 border border-gray-600 px-1.5 py-0.5 text-[10px] font-semibold rounded">
-                    HD
-                  </span>
-                </div>
-                <h3 className="text-white font-bold text-sm truncate">
-                  {movie.title || movie.name}
-                </h3>
-                {primaryGenre && (
-                  <p className="text-red-500 text-[10px] font-black uppercase tracking-widest bg-red-900/20 inline-block px-2 py-0.5 rounded">
-                    {primaryGenre}
-                  </p>
-                )}
-                <div className="flex items-center gap-2 text-[11px] text-gray-400">
-                  <div className="flex items-center gap-1">
-                    <Star size={12} fill="currentColor" className="text-yellow-500" />
-                    <span className="text-yellow-500 font-semibold">{movie.vote_average?.toFixed(1)}</span>
-                  </div>
-                  <span>•</span>
-                  <span className="font-medium">{movie.release_date?.split('-')[0] || movie.first_air_date?.split('-')[0]}</span>
-                </div>
+              <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-white/55">
+                <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">TMDB {rating}</span>
+                <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">IMDb-style</span>
+                <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">{year}</span>
               </div>
+
+              <p className="line-clamp-3 text-sm leading-6 text-white/72">
+                {movie.overview || 'A cinematic pick tailored to your taste.'}
+              </p>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.article>
   );
 }
