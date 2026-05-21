@@ -1,6 +1,24 @@
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const backendRoot = path.resolve(__dirname, '..', '..');
+const workspaceRoot = path.resolve(backendRoot, '..');
+
+const envFiles = [
+	path.join(workspaceRoot, '.env'),
+	path.join(backendRoot, '.env')
+];
+
+for (const envPath of envFiles) {
+	if (fs.existsSync(envPath)) {
+		dotenv.config({ path: envPath });
+	}
+}
 
 export const HOST = '0.0.0.0';
 export const REQUESTED_PORT = Number(process.env.PORT) || 3000;

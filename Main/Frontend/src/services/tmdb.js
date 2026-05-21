@@ -1,5 +1,9 @@
 const API_URL = (import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '');
-const BASE_URL = API_URL ? `${API_URL}/api/tmdb` : '/api/tmdb';
+const PROXY_BASE_URL = '/api/tmdb';
+const REMOTE_BASE_URL = API_URL ? `${API_URL}/api/tmdb` : '';
+const BASE_URLS = REMOTE_BASE_URL && REMOTE_BASE_URL !== PROXY_BASE_URL
+  ? [REMOTE_BASE_URL, PROXY_BASE_URL]
+  : [PROXY_BASE_URL];
 
 console.log('API URL:', import.meta.env.VITE_API_URL);
 if (!import.meta.env.VITE_API_URL && import.meta.env.PROD) {
@@ -8,36 +12,55 @@ if (!import.meta.env.VITE_API_URL && import.meta.env.PROD) {
 
 export const fetchFromTMDB = async (endpoint, params = {}, retries = 3) => {
   const queryParams = new URLSearchParams(params);
-  const url = `${BASE_URL}/${endpoint}?${queryParams.toString()}`;
-  
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    let timeoutId;
-    try {
-      const controller = new AbortController();
-      timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-      
-      const response = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        throw new Error(`TMDB Error: ${response.statusText}`);
+  let lastError;
+
+  for (let baseIndex = 0; baseIndex < BASE_URLS.length; baseIndex += 1) {
+    const baseUrl = BASE_URLS[baseIndex];
+    const url = `${baseUrl}/${endpoint}?${queryParams.toString()}`;
+
+    for (let attempt = 1; attempt <= retries; attempt += 1) {
+      let timeoutId;
+      try {
+        const controller = new AbortController();
+        timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          let errorText = response.statusText;
+          try {
+            const errorJson = await response.json();
+            errorText = errorJson?.error || errorText;
+          } catch {
+            // Ignore parse errors and keep statusText.
+          }
+          throw new Error(`TMDB Error ${response.status}: ${errorText}`);
+        }
+
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        lastError = error;
+
+        if (attempt < retries) {
+          console.warn(`⚠️ TMDB fetch attempt ${attempt}/${retries} failed, retrying...`);
+          await new Promise((resolve) => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
+          continue;
+        }
+
+        if (baseIndex < BASE_URLS.length - 1) {
+          console.warn(`⚠️ Switching TMDB base URL fallback after ${retries} failed attempts:`, baseUrl);
+        }
       }
-      
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      clearTimeout(timeoutId);
-      
-      if (attempt === retries) {
-        console.error(`❌ TMDB fetch failed after ${retries} attempts:`, endpoint, error.message);
-        // Return empty result instead of throwing
-        return { results: [], error: error.message };
-      }
-      
-      console.warn(`⚠️ TMDB fetch attempt ${attempt}/${retries} failed, retrying...`);
-      await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
     }
   }
+
+  const errorMessage = lastError?.message || 'Unknown error';
+  console.error(`❌ TMDB fetch failed after retries across all base URLs:`, endpoint, errorMessage);
+  // Return empty result instead of throwing
+  return { results: [], error: errorMessage };
 };
 
 export const getTrendingMovies = () => fetchFromTMDB('trending/movie/day');

@@ -95,13 +95,28 @@ async function startServer() {
     next();
   });
 
-  app.get('/api/health', (_req, res) => {
+  app.get('/api/health', async (_req, res) => {
+    let tmdbReachable = false;
+
+    if (TMDB_API_KEY) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        const resp = await fetch(`https://api.themoviedb.org/3/trending/movie/day?api_key=${TMDB_API_KEY}`, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        tmdbReachable = resp && resp.ok;
+      } catch (err) {
+        tmdbReachable = false;
+      }
+    }
+
     res.json({
       ok: true,
       service: 'CineMatch Backend',
       env: NODE_ENV,
       mongoConnected: isMongoConnected(),
       tmdbConfigured: Boolean(TMDB_API_KEY),
+      tmdbReachable,
       appUrl: APP_URL,
       timestamp: new Date().toISOString(),
     });

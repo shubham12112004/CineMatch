@@ -1,4 +1,10 @@
 import { Router } from 'express';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -20,6 +26,18 @@ async function fetchWithTimeout(url, timeout = 30000) {
 
 export function createTmdbRouter(tmdbApiKey) {
   const router = Router();
+
+  router.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(204);
+    }
+
+    return next();
+  });
 
   const buildTmdbUrl = (endpoint, query) => {
     const queryParams = new URLSearchParams(query);
@@ -44,6 +62,20 @@ export function createTmdbRouter(tmdbApiKey) {
       } catch (error) {
         if (attempts >= maxAttempts) {
           console.error(`❌ TMDB API Error (after ${attempts} attempts):`, error.message);
+
+          // Try to serve a local fallback/mock response for development
+          try {
+            const fallbackPath = path.resolve(__dirname, '..', 'state', 'tmdb_fallback.json');
+            if (fs.existsSync(fallbackPath)) {
+              const raw = fs.readFileSync(fallbackPath, 'utf8');
+              const mock = JSON.parse(raw);
+              console.warn('⚠️ Serving TMDB fallback mock response from', fallbackPath);
+              return res.json(Object.assign({}, mock, { _mock: true }));
+            }
+          } catch (fsErr) {
+            console.warn('⚠️ Failed to load TMDB fallback mock:', fsErr.message || fsErr);
+          }
+
           return res.status(500).json({ error: 'Failed to fetch from TMDB. Check your internet connection.' });
         }
 

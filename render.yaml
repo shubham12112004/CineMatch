@@ -5,30 +5,22 @@ services:
     region: oregon
     plan: free
     buildCommand: npm install
-    startCommand: npm run dev
+    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 3000
       - key: TMDB_API_KEY
-        fromDatabase:
-          name: TMDB_API_KEY
+        sync: false
       - key: MONGODB_URI
-        fromDatabase:
-          name: MONGODB_URI
+        sync: false
       - key: JWT_SECRET
-        fromDatabase:
-          name: JWT_SECRET
+        sync: false
       - key: GOOGLE_CLIENT_ID
-        fromDatabase:
-          name: GOOGLE_CLIENT_ID
+        sync: false
       - key: GOOGLE_CLIENT_SECRET
-        fromDatabase:
-          name: GOOGLE_CLIENT_SECRET
+        sync: false
       - key: GEMINI_API_KEY
-        fromDatabase:
-          name: GEMINI_API_KEY
+        sync: false
       - key: APP_URL
         value: https://cinematch-6s53.onrender.com
       - key: CORS_ORIGINS
