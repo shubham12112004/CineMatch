@@ -6,6 +6,52 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { getMemoryUserByEmail, hasMemoryUser, saveMemoryUser } from '../state/memoryStore.js';
 import { resolveMemoryUser } from '../middleware/authMiddleware.js';
 
+function getAllowedOrigins() {
+  return (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
+
+function matchesOriginPattern(origin, pattern) {
+  if (!origin || !pattern) return false;
+  if (pattern === origin) return true;
+
+  try {
+    const originUrl = new URL(origin);
+    const patternUrl = new URL(pattern.replace('*.', 'placeholder.'));
+
+    if (pattern.includes('*')) {
+      const hostPattern = patternUrl.hostname.replace('placeholder.', '');
+      return originUrl.protocol === patternUrl.protocol && originUrl.hostname.endsWith(hostPattern);
+    }
+  } catch {
+    return false;
+  }
+
+  return false;
+}
+
+function resolveFrontendRedirect(req) {
+  const fallback = process.env.FRONTEND_URL || process.env.APP_URL || 'https://cine-match-coral.vercel.app';
+  const candidate = req.query.redirectTo || req.query.state || fallback;
+  const allowedOrigins = getAllowedOrigins();
+
+  try {
+    const decoded = decodeURIComponent(String(candidate));
+    const url = new URL(decoded);
+    const allowed = allowedOrigins.length === 0 || allowedOrigins.some((pattern) => matchesOriginPattern(url.origin, pattern));
+
+    if (allowed) {
+      return url;
+    }
+  } catch {
+    // fall through to default
+  }
+
+  return new URL(fallback);
+}
+
 function makeMemoryUser(name, email, hashedPassword) {
   return {
     id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -54,7 +100,7 @@ function serializeUser(user) {
   Redirect should go to FRONTEND (Vercel)
 */
 function buildFrontendRedirect(req, params) {
-  const url = new URL(process.env.APP_URL || "https://cine-match-coral.vercel.app");
+  const url = resolveFrontendRedirect(req);
 
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') {
@@ -76,6 +122,7 @@ export function createAuthRouter({
 
   const router = Router();
   const googleAuthEnabled = Boolean(googleClientId && googleClientSecret);
+  const callbackBaseUrl = String(appUrl || process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
 
   if (googleAuthEnabled && !passport._strategies.google) {
 
@@ -89,7 +136,7 @@ export function createAuthRouter({
             FIXED:
             Callback must go to BACKEND (Render)
           */
-          callbackURL: "https://cinematch-6s53.onrender.com/api/auth/google/callback",
+          callbackURL: `${callbackBaseUrl}/api/auth/google/callback`,
 
         },
 
@@ -219,6 +266,7 @@ export function createAuthRouter({
       scope: ['profile', 'email'],
       session: false,
       prompt: 'select_account',
+      state: req.query.redirectTo ? String(req.query.redirectTo) : undefined,
     })(req, res, next);
 
   });
