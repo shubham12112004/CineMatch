@@ -1,1106 +1,1404 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { X, Search, Sparkles, Tv, Film, Heart, Clock, Star, Users } from 'lucide-react';
-import { motion } from 'motion/react';
-import { MOOD_GENRES, POSTER_BASE_URL, discoverContent, discoverTV, getMovieCredits, getPersonCombinedCredits, getPopularPeople, getTVDetails, getTVCredits, searchPerson } from '../services/tmdb';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  X,
+  Search,
+  Sparkles,
+  Mic,
+  MicOff,
+  WandSparkles,
+  Clock3,
+  Flame,
+  History,
+  Stars,
+  SlidersHorizontal,
+  RefreshCw,
+  Play,
+  Film,
+  Tv,
+  Star,
+  ArrowRight,
+  TrendingUp,
+  Brain,
+  BadgeInfo,
+  Heart,
+  ThumbsUp,
+} from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import {
+  GENRE_MAP,
+  MOOD_GENRES,
+  POSTER_BASE_URL,
+  discoverContent,
+  discoverTV,
+  fetchFromTMDB,
+  getMovieCredits,
+  getPersonCombinedCredits,
+  getPopularPeople,
+  getTVDetails,
+  getTVCredits,
+  searchPerson,
+} from '../services/tmdb';
 import MovieCard from './MovieCard';
 
-const MODE_OPTIONS = [
-  { key: 'movie', label: 'Movie', icon: Film },
-  { key: 'tv', label: 'Series', icon: Tv },
-  { key: 'drama', label: 'Drama Picks', icon: Heart },
-  { key: 'anime', label: 'Anime Picks', icon: Sparkles },
+const PLACEHOLDERS = [
+  'What do you want to watch tonight?',
+  'Describe your perfect movie mood...',
+  'Search by vibe, actor, genre, or feeling...',
+  'Funny action movie with a good ending',
+  'Dark thriller like Fight Club',
 ];
 
-const MOVIE_CATEGORY_OPTIONS = [
-  { label: 'Any Movie', genres: [] },
-  { label: 'Family Movie', genres: [10751] },
-  { label: 'Comedy Movie', genres: [35] },
-  { label: 'Romantic Movie', genres: [10749] },
-  { label: 'Adventure Movie', genres: [12] },
-  { label: 'Animated Movie', genres: [16] },
-  { label: 'Thriller Movie', genres: [53] },
-  { label: 'Mature Movie', genres: [80, 53] },
+const QUICK_PROMPTS = [
+  { label: 'Tonight\'s Picks', prompt: 'Tonight\'s picks with a good ending', tone: 'from-red-500/20 to-orange-400/10' },
+  { label: 'Weekend Binge', prompt: 'Best crime series under 2 seasons', tone: 'from-cyan-500/20 to-blue-400/10' },
+  { label: 'Hidden Gems', prompt: 'Hidden gem movies with high ratings', tone: 'from-violet-500/20 to-fuchsia-400/10' },
+  { label: 'Feel Good', prompt: 'Feel good family movies', tone: 'from-emerald-500/20 to-lime-400/10' },
+  { label: 'Mind-Bending Sci-Fi', prompt: 'Mind-bending sci-fi movies', tone: 'from-indigo-500/20 to-sky-400/10' },
+  { label: 'Underrated Masterpieces', prompt: 'Underrated masterpieces that deserve attention', tone: 'from-amber-500/20 to-yellow-400/10' },
 ];
 
-const SERIES_CATEGORY_OPTIONS = [
-  { label: 'Any Series', genres: [] },
-  { label: 'Family Show', genres: [10751] },
-  { label: 'Comedy Show', genres: [35] },
-  { label: 'Crime Show', genres: [80] },
-  { label: 'Thriller Show', genres: [53] },
-  { label: 'Adventure Show', genres: [12] },
-  { label: 'Documentary Series', genres: [99] },
-  { label: 'Fantasy Show', genres: [14] },
-];
-
-const STORY_FOCUS_OPTIONS = [
-  { key: 'any', label: 'Any Focus', keywords: [] },
-  { key: 'family', label: 'Family', keywords: ['family', 'parent', 'mother', 'father', 'daughter', 'son', 'siblings'] },
-  { key: 'couple', label: 'Couple', keywords: ['couple', 'love', 'romance', 'relationship', 'husband', 'wife', 'lover'] },
-  { key: 'solo', label: 'Solo', keywords: ['alone', 'solo', 'loner', 'survivor', 'journey', 'stranded'] },
-  { key: 'friends', label: 'Friends', keywords: ['friends', 'friendship', 'buddy', 'group', 'crew', 'gang'] },
-  { key: 'pets', label: 'Pets', keywords: ['dog', 'cat', 'pet', 'animal', 'puppy', 'horse'] },
-];
-
-const MAIN_GENRES = [
-  { id: 28, label: 'Action' },
-  { id: 12, label: 'Adventure' },
-  { id: 16, label: 'Animation' },
-  { id: 35, label: 'Comedy' },
-  { id: 80, label: 'Crime' },
-  { id: 18, label: 'Drama' },
-  { id: 10751, label: 'Family' },
-  { id: 14, label: 'Fantasy' },
-  { id: 27, label: 'Horror' },
-  { id: 9648, label: 'Mystery' },
-  { id: 10749, label: 'Romance' },
-  { id: 878, label: 'Sci-Fi' },
-  { id: 53, label: 'Thriller' },
-];
-
-const DURATION_OPTIONS = [
-  { key: 'any', label: 'Any Duration' },
-  { key: 'short', label: 'Short (<= 45 min)' },
-  { key: 'standard', label: 'Standard (46-90 min)' },
-  { key: 'long', label: 'Long (91-140 min)' },
-  { key: 'epic', label: 'Epic (141+ min)' },
-];
-
-const SEASON_OPTIONS = [
-  { key: 'any', label: 'Any Seasons' },
-  { key: '1-2', label: '1-2 Seasons' },
-  { key: '3-5', label: '3-5 Seasons' },
-  { key: '6+', label: '6+ Seasons' },
-];
-
-const ERA_OPTIONS = [
-  { key: 'any', label: 'Any Era' },
-  { key: 'classic', label: 'Classic (Before 2000)' },
-  { key: 'modern', label: 'Modern (2000-2015)' },
-  { key: 'latest', label: 'Latest (2016-Now)' },
+const TRENDING_MOODS = [
+  { label: 'Cozy Night', prompt: 'cozy feel good movies', icon: Heart },
+  { label: 'Big Laughs', prompt: 'funny action movie with good ending', icon: ThumbsUp },
+  { label: 'Edge of Seat', prompt: 'dark thriller like Fight Club', icon: Flame },
+  { label: 'Smart Sci-Fi', prompt: 'emotional sci-fi movies', icon: Brain },
+  { label: 'Family Dinner', prompt: 'family movie for dinner', icon: BadgeInfo },
 ];
 
 const LANGUAGE_OPTIONS = [
-  { name: 'Any', code: '' },
-  { name: 'English', code: 'en' },
-  { name: 'Hindi', code: 'hi' },
-  { name: 'Spanish', code: 'es' },
-  { name: 'French', code: 'fr' },
-  { name: 'German', code: 'de' },
-  { name: 'Japanese', code: 'ja' },
-  { name: 'Korean', code: 'ko' },
-  { name: 'Turkish', code: 'tr' },
+  { value: '', label: 'Any language' },
+  { value: 'en', label: 'English' },
+  { value: 'hi', label: 'Hindi' },
+  { value: 'es', label: 'Spanish' },
+  { value: 'fr', label: 'French' },
+  { value: 'de', label: 'German' },
+  { value: 'ja', label: 'Japanese' },
+  { value: 'ko', label: 'Korean' },
+  { value: 'tr', label: 'Turkish' },
 ];
 
-const DEFAULT_FILTERS = {
-  mood: '',
-  mode: 'movie',
-  contentCategory: 'Any Movie',
-  storyFocus: 'any',
-  selectedGenres: [],
-  rating: 6,
-  duration: 'any',
-  tvStatus: 'any',
-  seasonRange: 'any',
-  personId: null,
-  personName: '',
+const TYPE_OPTIONS = [
+  { value: 'all', label: 'All' },
+  { value: 'movie', label: 'Movies' },
+  { value: 'tv', label: 'Series' },
+];
+
+const SORT_OPTIONS = [
+  { value: 'smart', label: 'Smart Mix' },
+  { value: 'popular', label: 'Popular' },
+  { value: 'rating', label: 'Top Rated' },
+  { value: 'hidden', label: 'Hidden Gems' },
+];
+
+const DEFAULT_ADVANCED = {
+  type: 'all',
+  sort: 'smart',
   language: '',
-  era: 'any',
+  minRating: 0,
+  maxRuntime: '',
+  maxSeasons: '',
 };
 
-export default function SmartFinder({ onClose, onMovieClick, onToggleList, myList, onPreferenceSearch, onNoResultsToChat }) {
-  const [step, setStep] = useState(1);
-  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+const RECENT_SEARCH_STORAGE_KEY = 'cinematch_smart_finder_recent';
 
+const GENRE_KEYWORDS = [
+  { keyword: 'action', genreId: 28, label: 'Action' },
+  { keyword: 'adventure', genreId: 12, label: 'Adventure' },
+  { keyword: 'animation', genreId: 16, label: 'Animation' },
+  { keyword: 'anime', genreId: 16, label: 'Anime' },
+  { keyword: 'comedy', genreId: 35, label: 'Comedy' },
+  { keyword: 'crime', genreId: 80, label: 'Crime' },
+  { keyword: 'drama', genreId: 18, label: 'Drama' },
+  { keyword: 'family', genreId: 10751, label: 'Family' },
+  { keyword: 'fantasy', genreId: 14, label: 'Fantasy' },
+  { keyword: 'horror', genreId: 27, label: 'Horror' },
+  { keyword: 'mystery', genreId: 9648, label: 'Mystery' },
+  { keyword: 'romance', genreId: 10749, label: 'Romance' },
+  { keyword: 'romantic', genreId: 10749, label: 'Romantic' },
+  { keyword: 'science fiction', genreId: 878, label: 'Sci-Fi' },
+  { keyword: 'sci-fi', genreId: 878, label: 'Sci-Fi' },
+  { keyword: 'thriller', genreId: 53, label: 'Thriller' },
+  { keyword: 'documentary', genreId: 99, label: 'Documentary' },
+];
+
+const MOOD_KEYWORDS = [
+  { keyword: 'funny', genreId: 35, label: 'Funny' },
+  { keyword: 'laugh', genreId: 35, label: 'Comedy' },
+  { keyword: 'happy', genreId: 35, label: 'Happy' },
+  { keyword: 'feel good', genreId: 35, label: 'Feel-good' },
+  { keyword: 'emotional', genreId: 18, label: 'Emotional' },
+  { keyword: 'sad', genreId: 18, label: 'Emotional' },
+  { keyword: 'dark', genreId: 53, label: 'Dark' },
+  { keyword: 'scary', genreId: 27, label: 'Scary' },
+  { keyword: 'relax', genreId: 10751, label: 'Relaxing' },
+  { keyword: 'inspiring', genreId: 36, label: 'Inspiring' },
+  { keyword: 'mind bending', genreId: 878, label: 'Mind-bending' },
+  { keyword: 'mind-bending', genreId: 878, label: 'Mind-bending' },
+];
+
+function safeParseJson(value, fallback) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function normalizeQuery(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+function uniqueById(items) {
+  const seen = new Set();
+  return (items || []).filter((item) => {
+    const key = `${item?.media_type || item?.type || 'movie'}-${item?.id}`;
+    if (!item?.id || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function extractNumber(text) {
+  const match = text.match(/(\d+(?:\.\d+)?)/);
+  return match ? Number(match[1]) : null;
+}
+
+function extractTitleSeed(query) {
+  const likeMatch = query.match(/(?:like|similar to|similar as|similar with|in the style of)\s+(.+)$/i);
+  if (likeMatch?.[1]) return normalizeQuery(likeMatch[1].replace(/[?.!,]$/g, ''));
+
+  const quoteMatch = query.match(/["“](.+?)["”]/);
+  if (quoteMatch?.[1]) return normalizeQuery(quoteMatch[1]);
+
+  return '';
+}
+
+function parseIntent(query) {
+  const normalized = normalizeQuery(query);
+  const lowered = normalized.toLowerCase();
+  const intent = {
+    query: normalized,
+    seedTitle: extractTitleSeed(normalized),
+    mediaType: 'all',
+    genres: [],
+    moodTags: [],
+    actorName: '',
+    ratingMin: 0,
+    language: '',
+    sort: 'smart',
+    maxRuntime: '',
+    maxSeasons: '',
+    releaseWindow: '',
+    predictions: [],
+  };
+
+  if (/\b(series|show|shows|tv|tv show|tv series|season|seasons|episodes?)\b/.test(lowered)) {
+    intent.mediaType = 'tv';
+  }
+
+  if (/\b(movie|movies|film|films|cinema)\b/.test(lowered)) {
+    intent.mediaType = 'movie';
+  }
+
+  const seasonMatch = lowered.match(/(?:under|below|less than|up to|max(?:imum)?)\s*(\d+)\s*(?:season|seasons)/);
+  if (seasonMatch) {
+    intent.mediaType = 'tv';
+    intent.maxSeasons = Number(seasonMatch[1]);
+  }
+
+  const runtimeMatch = lowered.match(/(?:under|below|less than|up to|max(?:imum)?)\s*(\d+)\s*(?:minutes?|mins?|min|hours?|hrs?|hr)/);
+  if (runtimeMatch) {
+    const value = Number(runtimeMatch[1]);
+    intent.maxRuntime = /hour|hr/.test(runtimeMatch[0]) ? value * 60 : value;
+  }
+
+  if (/\b(short|quick|snackable)\b/.test(lowered)) intent.maxRuntime = intent.maxRuntime || 90;
+  if (/\b(long|epic|marathon)\b/.test(lowered)) intent.maxRuntime = intent.maxRuntime || 180;
+
+  if (/\b(top rated|best|highest rated|masterpiece|must watch|great ending)\b/.test(lowered)) {
+    intent.sort = 'rating';
+    intent.ratingMin = Math.max(intent.ratingMin, 7.2);
+  }
+
+  if (/\b(popular|trending|everyone is watching|big hit)\b/.test(lowered)) {
+    intent.sort = 'popular';
+  }
+
+  if (/\b(hidden gem|underrated|underseen|sleeper)\b/.test(lowered)) {
+    intent.sort = 'hidden';
+    intent.ratingMin = Math.max(intent.ratingMin, 7.0);
+  }
+
+  if (/\b(good ending|happy ending|feel good|uplifting|lighthearted)\b/.test(lowered)) {
+    intent.moodTags.push('uplifting');
+    intent.ratingMin = Math.max(intent.ratingMin, 6.5);
+  }
+
+  if (/\b(english)\b/.test(lowered)) intent.language = 'en';
+  if (/\b(hindi|bollywood)\b/.test(lowered)) intent.language = 'hi';
+  if (/\b(spanish)\b/.test(lowered)) intent.language = 'es';
+  if (/\b(french)\b/.test(lowered)) intent.language = 'fr';
+  if (/\b(german)\b/.test(lowered)) intent.language = 'de';
+  if (/\b(japanese|anime)\b/.test(lowered)) intent.language = 'ja';
+  if (/\b(korean)\b/.test(lowered)) intent.language = 'ko';
+  if (/\b(turkish)\b/.test(lowered)) intent.language = 'tr';
+
+  if (/\b(90s|1990s)\b/.test(lowered)) intent.releaseWindow = '1990s';
+  if (/\b(2000s|2000-2010)\b/.test(lowered)) intent.releaseWindow = '2000s';
+  if (/\b(classic|old school|old movie|old show)\b/.test(lowered)) intent.releaseWindow = 'classic';
+  if (/\b(modern|recent|new|latest)\b/.test(lowered)) intent.releaseWindow = 'modern';
+
+  GENRE_KEYWORDS.forEach((entry) => {
+    if (lowered.includes(entry.keyword)) {
+      intent.genres.push({ id: entry.genreId, label: entry.label });
+    }
+  });
+
+  MOOD_KEYWORDS.forEach((entry) => {
+    if (lowered.includes(entry.keyword)) {
+      intent.genres.push({ id: entry.genreId, label: entry.label });
+      intent.moodTags.push(entry.label);
+    }
+  });
+
+  const actorPatterns = [
+    /(?:with|starring|featuring|actor|actress)\s+([A-Z][\p{L}.'-]+(?:\s+[A-Z][\p{L}.'-]+){0,3})/u,
+    /(?:movie|series)\s+with\s+([A-Z][\p{L}.'-]+(?:\s+[A-Z][\p{L}.'-]+){0,3})/u,
+  ];
+  for (const pattern of actorPatterns) {
+    const match = normalized.match(pattern);
+    if (match?.[1]) {
+      intent.actorName = normalizeQuery(match[1]);
+      break;
+    }
+  }
+
+  if (intent.mediaType === 'all' && (intent.genres.some((g) => g.id === 80 || g.id === 53) || /\b(thriller|crime|mystery)\b/.test(lowered))) {
+    intent.mediaType = lowered.includes('series') ? 'tv' : 'all';
+  }
+
+  if (!intent.maxRuntime && /\b(fast|short|quick)\b/.test(lowered)) {
+    intent.maxRuntime = 100;
+  }
+
+  intent.predictions = buildPredictionChips(intent);
+  return intent;
+}
+
+function buildPredictionChips(intent) {
+  const chips = [];
+
+  if (intent.seedTitle) chips.push(`Similar to ${intent.seedTitle}`);
+  if (intent.moodTags[0]) chips.push(intent.moodTags[0]);
+  if (intent.genres[0]?.label) chips.push(intent.genres[0].label);
+  if (intent.actorName) chips.push(`With ${intent.actorName}`);
+  if (intent.maxSeasons) chips.push(`Under ${intent.maxSeasons} seasons`);
+  if (intent.maxRuntime) chips.push(`Under ${intent.maxRuntime} min`);
+  if (intent.sort === 'hidden') chips.push('Hidden gems');
+  if (intent.sort === 'rating') chips.push('Top rated');
+
+  return [...new Set(chips)].slice(0, 4);
+}
+
+function formatRuntime(runtime) {
+  if (!runtime) return '';
+  if (runtime < 60) return `${runtime}m`;
+  const hours = Math.floor(runtime / 60);
+  const minutes = runtime % 60;
+  return `${hours}h ${minutes ? `${minutes}m` : ''}`.trim();
+}
+
+function getGenreLabels(ids = []) {
+  return ids.map((id) => GENRE_MAP[id]).filter(Boolean).slice(0, 3);
+}
+
+function makeRecentSearchItems(raw) {
+  const normalized = normalizeQuery(raw);
+  if (!normalized) return [];
+
+  const existing = safeParseJson(localStorage.getItem(RECENT_SEARCH_STORAGE_KEY), []);
+  const next = [normalized, ...existing.filter((item) => item !== normalized)].slice(0, 6);
+  localStorage.setItem(RECENT_SEARCH_STORAGE_KEY, JSON.stringify(next));
+  return next;
+}
+
+function buildPreferencePrompt(myList) {
+  const genreCounts = new Map();
+
+  (myList || []).forEach((item) => {
+    (item.genre_ids || []).forEach((genreId) => {
+      genreCounts.set(genreId, (genreCounts.get(genreId) || 0) + 1);
+    });
+  });
+
+  const favorites = [...genreCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([genreId]) => GENRE_MAP[genreId])
+    .filter(Boolean);
+
+  if (!favorites.length) return 'Recommend something I will love tonight';
+  return `Because I watched ${favorites.join(', ')}, recommend my next pick`;
+}
+
+function buildSummaryLabel(intent) {
+  const parts = [];
+  if (intent.mediaType === 'movie') parts.push('movies only');
+  if (intent.mediaType === 'tv') parts.push('series only');
+  if (intent.genres[0]?.label) parts.push(intent.genres[0].label);
+  if (intent.moodTags[0]) parts.push(intent.moodTags[0]);
+  if (intent.actorName) parts.push(`with ${intent.actorName}`);
+  if (intent.maxSeasons) parts.push(`under ${intent.maxSeasons} seasons`);
+  if (intent.maxRuntime) parts.push(`under ${intent.maxRuntime} min`);
+  if (intent.language) parts.push(intent.language.toUpperCase());
+  return parts.length ? parts.join(' • ') : 'Smart match';
+}
+
+export default function SmartFinder({ onClose, onMovieClick, onToggleList, myList, onPreferenceSearch, onNoResultsToChat }) {
+  const [query, setQuery] = useState('');
+  const [assistantLine, setAssistantLine] = useState('Tell me the vibe and I will narrow it down instantly.');
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [actorQuery, setActorQuery] = useState('');
-  const [actorResults, setActorResults] = useState([]);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [recentSearches, setRecentSearches] = useState([]);
+  const [predictions, setPredictions] = useState([]);
+  const [intentPreview, setIntentPreview] = useState(null);
+  const [quickType, setQuickType] = useState('all');
+  const [advanced, setAdvanced] = useState(DEFAULT_ADVANCED);
   const [popularActors, setPopularActors] = useState([]);
-  const [relatedActors, setRelatedActors] = useState([]);
-  const [actorLoading, setActorLoading] = useState(false);
+  const [heroRecommendations, setHeroRecommendations] = useState([]);
+  const [becauseYouWatched, setBecauseYouWatched] = useState([]);
+  const [featuredCollections, setFeaturedCollections] = useState([]);
+  const requestIdRef = useRef(0);
+  const recognitionRef = useRef(null);
+  const textareaRef = useRef(null);
 
-  const includesTV = useMemo(() => ['tv', 'drama', 'anime'].includes(filters.mode), [filters.mode]);
-  const categoryOptions = useMemo(() => {
-    if (filters.mode === 'movie') return MOVIE_CATEGORY_OPTIONS;
-    return SERIES_CATEGORY_OPTIONS;
-  }, [filters.mode]);
-
-  const updateFilter = (key, value) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const resetFilters = () => {
-    setFilters(DEFAULT_FILTERS);
-    setActorQuery('');
-    setActorResults([]);
-    setPopularActors([]);
-    setRelatedActors([]);
-  };
-
-  const nextStep = () => {
-    setStep((prev) => {
-      let next = prev + 1;
-      if (next === 8 && !includesTV) next = 9;
-      return next;
-    });
-  };
-
-  const prevStep = () => {
-    setStep((prev) => {
-      let next = prev - 1;
-      if (prev === 9 && !includesTV) next = 7;
-      return Math.max(1, next);
-    });
-  };
-
-  const normalizePeople = (people) => {
-    const seen = new Set();
-    return (people || [])
-      .filter((person) => person?.id && !seen.has(person.id))
-      .filter((person) => !!person?.name)
-      .filter((person) => (person.known_for_department || '').toLowerCase() === 'acting' || person.known_for_department === undefined)
-      .filter((person) => {
-        if (seen.has(person.id)) return false;
-        seen.add(person.id);
-        return true;
-      })
-      .sort((a, b) => {
-        const hasImageDiff = Number(Boolean(b.profile_path)) - Number(Boolean(a.profile_path));
-        if (hasImageDiff !== 0) return hasImageDiff;
-        return (b.popularity || 0) - (a.popularity || 0);
-      })
-      .slice(0, 18);
-  };
-
-  const selectActor = (person) => {
-    updateFilter('personId', person.id);
-    updateFilter('personName', person.name || '');
-    setActorQuery(person.name || '');
-  };
-
-  const clearActorSelection = () => {
-    updateFilter('personId', null);
-    updateFilter('personName', '');
-    setActorQuery('');
-    setRelatedActors([]);
-  };
+  const placeholder = PLACEHOLDERS[placeholderIndex % PLACEHOLDERS.length];
 
   useEffect(() => {
-    if (step !== 9 || actorQuery.trim().length >= 2 || popularActors.length) return;
+    const timer = setInterval(() => {
+      setPlaceholderIndex((prev) => prev + 1);
+    }, 2800);
 
-    let active = true;
-    (async () => {
-      try {
-        const [page1, page2] = await Promise.all([getPopularPeople(1), getPopularPeople(2)]);
-        if (!active) return;
-        const merged = [...(page1?.results || []), ...(page2?.results || [])];
-        setPopularActors(normalizePeople(merged));
-      } catch {
-        if (!active) return;
-        setPopularActors([]);
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, [actorQuery, popularActors.length, step]);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
-    if (step !== 9) return;
-
-    const query = actorQuery.trim();
-    if (query.length < 2) {
-      setActorResults([]);
-      setActorLoading(false);
-      return;
-    }
-
-    let active = true;
-    setActorLoading(true);
-    const timeoutId = setTimeout(async () => {
-      try {
-        const data = await searchPerson(query);
-        if (!active) return;
-        setActorResults(normalizePeople(data?.results));
-      } catch {
-        if (!active) return;
-        setActorResults([]);
-      } finally {
-        if (active) setActorLoading(false);
-      }
-    }, 300);
-
-    return () => {
-      active = false;
-      clearTimeout(timeoutId);
-    };
-  }, [actorQuery, step]);
+    setRecentSearches(safeParseJson(localStorage.getItem(RECENT_SEARCH_STORAGE_KEY), []));
+  }, []);
 
   useEffect(() => {
-    if (step !== 9 || !filters.personId) {
-      setRelatedActors([]);
-      return;
-    }
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return undefined;
 
-    let active = true;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
 
-    (async () => {
-      try {
-        const creditsData = await getPersonCombinedCredits(filters.personId);
-        const credits = (creditsData?.cast || [])
-          .filter((item) => item?.id && (item.media_type === 'movie' || item.media_type === 'tv'))
-          .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
-          .slice(0, 6);
-
-        const coActorMap = new Map();
-        await Promise.all(
-          credits.map(async (credit) => {
-            try {
-              const castData = credit.media_type === 'tv'
-                ? await getTVCredits(credit.id)
-                : await getMovieCredits(credit.id);
-
-              (castData?.cast || []).slice(0, 15).forEach((member) => {
-                if (!member?.id || member.id === filters.personId || !member?.name) return;
-                const existing = coActorMap.get(member.id) || { ...member, score: 0 };
-                existing.score += Math.max(1, 15 - (member.order ?? 14));
-                coActorMap.set(member.id, existing);
-              });
-            } catch {
-              // Ignore a single credit failure and continue with others.
-            }
-          })
-        );
-
-        if (!active) return;
-        const related = Array.from(coActorMap.values())
-          .sort((a, b) => {
-            const scoreDiff = (b.score || 0) - (a.score || 0);
-            if (scoreDiff !== 0) return scoreDiff;
-            return (b.popularity || 0) - (a.popularity || 0);
-          })
-          .filter((person) => person.id !== filters.personId)
-          .slice(0, 12);
-        setRelatedActors(related);
-      } catch {
-        if (!active) return;
-        setRelatedActors([]);
-      }
-    })();
-
-    return () => {
-      active = false;
+    recognition.onresult = (event) => {
+      const transcript = event.results?.[0]?.[0]?.transcript || '';
+      setQuery(transcript);
+      setIsListening(false);
+      textareaRef.current?.focus();
     };
-  }, [filters.personId, step]);
 
-  const skipCurrentStep = () => {
-    if (step === 1) updateFilter('mood', '');
-    if (step === 2) {
-      updateFilter('mode', 'movie');
-      updateFilter('contentCategory', 'Any Movie');
-      updateFilter('storyFocus', 'any');
-    }
-    if (step === 3) {
-      updateFilter('contentCategory', filters.mode === 'movie' ? 'Any Movie' : 'Any Series');
-    }
-    if (step === 4) updateFilter('storyFocus', 'any');
-    if (step === 5) updateFilter('selectedGenres', []);
-    if (step === 6) updateFilter('rating', DEFAULT_FILTERS.rating);
-    if (step === 7) updateFilter('duration', 'any');
-    if (step === 8) {
-      updateFilter('tvStatus', 'any');
-      updateFilter('seasonRange', 'any');
-    }
-    if (step === 9) {
-      updateFilter('personId', null);
-      updateFilter('personName', '');
-      setActorQuery('');
-      setActorResults([]);
-      setPopularActors([]);
-      setRelatedActors([]);
-    }
-    if (step === 10) updateFilter('language', '');
-    if (step === 11) {
-      updateFilter('era', 'any');
-      runFinder();
-      return;
-    }
-    nextStep();
-  };
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
 
-  const toggleGenre = (genreId) => {
-    setFilters((prev) => {
-      const exists = prev.selectedGenres.includes(genreId);
-      return {
-        ...prev,
-        selectedGenres: exists
-          ? prev.selectedGenres.filter((id) => id !== genreId)
-          : [...prev.selectedGenres, genreId],
-      };
-    });
-  };
-
-  const applyRuntimeFilter = (params, durationKey) => {
-    if (durationKey === 'short') {
-      params['with_runtime.lte'] = 45;
-    } else if (durationKey === 'standard') {
-      params['with_runtime.gte'] = 46;
-      params['with_runtime.lte'] = 90;
-    } else if (durationKey === 'long') {
-      params['with_runtime.gte'] = 91;
-      params['with_runtime.lte'] = 140;
-    } else if (durationKey === 'epic') {
-      params['with_runtime.gte'] = 141;
-    }
-  };
-
-  const applyEraFilter = (params, eraKey, isTvQuery) => {
-    if (eraKey === 'classic') {
-      if (isTvQuery) params['first_air_date.lte'] = '1999-12-31';
-      else params['primary_release_date.lte'] = '1999-12-31';
-    } else if (eraKey === 'modern') {
-      if (isTvQuery) {
-        params['first_air_date.gte'] = '2000-01-01';
-        params['first_air_date.lte'] = '2015-12-31';
-      } else {
-        params['primary_release_date.gte'] = '2000-01-01';
-        params['primary_release_date.lte'] = '2015-12-31';
+    recognitionRef.current = recognition;
+    return () => {
+      try {
+        recognition.stop();
+      } catch {
+        // Ignore cleanup failures.
       }
-    } else if (eraKey === 'latest') {
-      if (isTvQuery) params['first_air_date.gte'] = '2016-01-01';
-      else params['primary_release_date.gte'] = '2016-01-01';
-    }
-  };
+    };
+  }, []);
 
-  const applyTVStateFilter = (params) => {
-    if (filters.tvStatus === 'completed') {
-      params.with_status = '3';
-    } else if (filters.tvStatus === 'airing') {
-      params.with_status = '0';
-    }
-  };
+  useEffect(() => {
+    const parsed = parseIntent(query);
+    setIntentPreview(parsed);
+    setPredictions(parsed.predictions);
+    setAdvanced((prev) => ({
+      ...prev,
+      type: parsed.mediaType === 'all' ? prev.type : parsed.mediaType,
+    }));
+  }, [query]);
 
-  const applyModeGenres = () => {
-    const modeGenres = [];
-    if (filters.mode === 'drama') modeGenres.push(18);
-    if (filters.mode === 'anime') modeGenres.push(16);
-    return modeGenres;
-  };
-
-  const applyStoryFocusFilter = (items) => {
-    if (filters.storyFocus === 'any') return items;
-
-    const activeFocus = STORY_FOCUS_OPTIONS.find((option) => option.key === filters.storyFocus);
-    if (!activeFocus?.keywords?.length) return items;
-
-    const filtered = items.filter((item) => {
-      const searchableText = `${item.title || item.name || ''} ${item.overview || ''}`.toLowerCase();
-      return activeFocus.keywords.some((keyword) => searchableText.includes(keyword));
-    });
-
-    return filtered;
-  };
-
-  const getSeasonMatcher = () => {
-    if (filters.seasonRange === '1-2') return (count) => count >= 1 && count <= 2;
-    if (filters.seasonRange === '3-5') return (count) => count >= 3 && count <= 5;
-    if (filters.seasonRange === '6+') return (count) => count >= 6;
-    return () => true;
-  };
-
-  const enrichAndFilterTVBySeasons = async (tvItems) => {
-    if (filters.seasonRange === 'any') return tvItems;
-
-    const matcher = getSeasonMatcher();
-    const trimmed = tvItems.slice(0, 20);
-
-    const detailed = await Promise.all(
-      trimmed.map(async (item) => {
-        try {
-          const detail = await getTVDetails(item.id);
-          return { ...item, number_of_seasons: item.number_of_seasons ?? detail?.number_of_seasons };
-        } catch {
-          return item;
-        }
-      })
-    );
-
-    return detailed.filter((item) => matcher(item.number_of_seasons || 0));
-  };
-
-  const enforcePersonFilter = async (items) => {
-    if (!filters.personId) return items;
-
-    const inspected = items.slice(0, 60);
-    const checks = await Promise.all(
-      inspected.map(async (item) => {
-        try {
-          const credits = item.media_type === 'tv'
-            ? await getTVCredits(item.id)
-            : await getMovieCredits(item.id);
-          const exists = (credits?.cast || []).some((member) => member.id === filters.personId);
-          return exists ? item : null;
-        } catch {
-          return null;
-        }
-      })
-    );
-
-    return checks.filter(Boolean);
-  };
-
-  const buildNoMatchEscalationMessage = () => {
-    const summary = [
-      filters.mood ? `mood: ${filters.mood}` : null,
-      `mode: ${filters.mode}`,
-      `rating >= ${filters.rating}`,
-      filters.personName ? `actor: ${filters.personName}` : null,
-      filters.language ? `language: ${filters.language}` : null,
-      filters.storyFocus !== 'any' ? `story focus: ${filters.storyFocus}` : null,
-    ].filter(Boolean).join(', ');
-
-    return `Sorry, I could not find exact matches for your selected filters (${summary}). Can you explain it a bit more? You can type it or use the mic, and I will suggest accurate titles based on your prompt.`;
-  };
-
-  const runFinder = async () => {
-    setLoading(true);
-    try {
-      const moodGenre = MOOD_GENRES[filters.mood];
-      const category = categoryOptions.find((item) => item.label === filters.contentCategory);
-      const modeGenres = applyModeGenres();
-
-      const mergedGenres = [
-        ...filters.selectedGenres,
-        ...(category?.genres || []),
-        ...modeGenres,
-        ...(moodGenre ? [moodGenre] : []),
-      ];
-
-      const uniqueGenres = [...new Set(mergedGenres)];
-
-      const movieParams = {
-        sort_by: 'popularity.desc',
-        include_adult: false,
-        'vote_average.gte': filters.rating,
-      };
-
-      const tvParams = {
-        sort_by: 'popularity.desc',
-        include_adult: false,
-        'vote_average.gte': filters.rating,
-      };
-
-      if (uniqueGenres.length) {
-        movieParams.with_genres = uniqueGenres.join(',');
-        tvParams.with_genres = uniqueGenres.join(',');
+  useEffect(() => {
+    const debounce = setTimeout(async () => {
+      const normalized = normalizeQuery(query);
+      if (normalized.length < 2) {
+        setHeroRecommendations([]);
+        return;
       }
 
-      if (filters.language) {
-        movieParams.with_original_language = filters.language;
-        tvParams.with_original_language = filters.language;
+      try {
+        const data = await fetchFromTMDB('search/multi', {
+          query: normalized,
+          include_adult: false,
+        });
+
+        const items = uniqueById((data.results || []).filter((item) => item.media_type === 'movie' || item.media_type === 'tv'));
+        setHeroRecommendations(items.slice(0, 5));
+      } catch {
+        setHeroRecommendations([]);
       }
+    }, 260);
 
-      applyRuntimeFilter(movieParams, filters.duration);
-      applyRuntimeFilter(tvParams, filters.duration);
-      applyEraFilter(movieParams, filters.era, false);
-      applyEraFilter(tvParams, filters.era, true);
-      applyTVStateFilter(tvParams);
+    return () => clearTimeout(debounce);
+  }, [query]);
 
-      if (filters.personId) {
-        movieParams.with_cast = filters.personId;
-        tvParams.with_people = filters.personId;
-      }
-
-      let final = [];
-
-      if (filters.mode === 'movie') {
-        const movieData = await discoverContent(movieParams);
-        final = (movieData?.results || []).map((item) => ({ ...item, media_type: 'movie' }));
-      } else if (filters.mode === 'tv') {
-        const tvData = await discoverTV(tvParams);
-        const tvOnly = (tvData?.results || []).map((item) => ({ ...item, media_type: 'tv' }));
-        final = await enrichAndFilterTVBySeasons(tvOnly);
-      } else {
-        const [movieData, tvData] = await Promise.all([
-          discoverContent(movieParams),
-          discoverTV(tvParams),
+  useEffect(() => {
+    const buildCollections = async () => {
+      try {
+        const [trendingMovies, trendingSeries] = await Promise.all([
+          discoverContent({ sort_by: 'popularity.desc', include_adult: false }),
+          discoverTV({ sort_by: 'popularity.desc', include_adult: false }),
         ]);
 
-        const movies = (movieData?.results || []).map((item) => ({ ...item, media_type: 'movie' }));
-        const tv = (tvData?.results || []).map((item) => ({ ...item, media_type: 'tv' }));
-        const filteredTv = await enrichAndFilterTVBySeasons(tv);
-        final = [...movies, ...filteredTv];
+        setFeaturedCollections([
+          {
+            title: 'Tonight\'s Picks',
+            subtitle: 'Balanced, high-retention recommendations for the evening.',
+            prompt: 'Tonight\'s picks with a good ending',
+            items: uniqueById([...(trendingMovies.results || []), ...(trendingSeries.results || [])]).slice(0, 6),
+          },
+          {
+            title: 'Weekend Binge',
+            subtitle: 'Series that reward longer sessions without friction.',
+            prompt: 'Best crime series under 2 seasons',
+            items: uniqueById(trendingSeries.results || []).slice(0, 6),
+          },
+          {
+            title: 'Hidden Gems',
+            subtitle: 'Under-the-radar titles with strong audience response.',
+            prompt: 'Hidden gem movies with high ratings',
+            items: uniqueById(trendingMovies.results || []).slice(0, 6),
+          },
+        ]);
+      } catch {
+        setFeaturedCollections([]);
+      }
+    };
+
+    buildCollections();
+  }, []);
+
+  useEffect(() => {
+    const buildBecauseYouWatched = async () => {
+      if (!myList?.length) {
+        setBecauseYouWatched([]);
+        return;
       }
 
-      // Enforce strict matching so every selected filter is respected.
-      final = final.filter((item) => {
-        const genreIds = Array.isArray(item.genre_ids) ? item.genre_ids : [];
-
-        if (moodGenre && !genreIds.includes(moodGenre)) return false;
-        if (uniqueGenres.length > 0 && uniqueGenres.some((id) => !genreIds.includes(id))) return false;
-        if (Number(item.vote_average || 0) < Number(filters.rating || 0)) return false;
-        if (filters.language && item.original_language !== filters.language) return false;
-
-        return true;
+      const genreCounts = new Map();
+      (myList || []).forEach((item) => {
+        (item.genre_ids || []).forEach((genreId) => {
+          genreCounts.set(genreId, (genreCounts.get(genreId) || 0) + 1);
+        });
       });
 
-      final = applyStoryFocusFilter(final);
-      final = await enforcePersonFilter(final);
-      final.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+      const favoriteGenres = [...genreCounts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 2)
+        .map(([genreId]) => genreId);
 
-      const finalMatches = final.slice(0, 60);
-      setResults(finalMatches);
-
-      if (finalMatches.length === 0 && typeof onNoResultsToChat === 'function') {
-        onNoResultsToChat(buildNoMatchEscalationMessage());
+      if (!favoriteGenres.length) {
+        setBecauseYouWatched([]);
+        return;
       }
 
-      setStep(12);
-    } catch (err) {
-      console.error('Smart finder search failed', err);
-      setResults([]);
-      if (typeof onNoResultsToChat === 'function') {
-        onNoResultsToChat(buildNoMatchEscalationMessage());
+      try {
+        const [movies, tv] = await Promise.all([
+          discoverContent({ with_genres: favoriteGenres.join(','), sort_by: 'vote_average.desc', 'vote_count.gte': 200, include_adult: false }),
+          discoverTV({ with_genres: favoriteGenres.join(','), sort_by: 'vote_average.desc', 'vote_count.gte': 200, include_adult: false }),
+        ]);
+
+        setBecauseYouWatched(uniqueById([...(movies.results || []), ...(tv.results || [])]).slice(0, 6));
+      } catch {
+        setBecauseYouWatched([]);
       }
-      setStep(12);
-    } finally {
-      setLoading(false);
+    };
+
+    buildBecauseYouWatched();
+  }, [myList]);
+
+  useEffect(() => {
+    const loadPopularActors = async () => {
+      try {
+        const [page1, page2] = await Promise.all([getPopularPeople(1), getPopularPeople(2)]);
+        const merged = [...(page1?.results || []), ...(page2?.results || [])]
+          .filter((person) => person?.id && person?.name)
+          .slice(0, 10);
+        setPopularActors(merged);
+      } catch {
+        setPopularActors([]);
+      }
+    };
+
+    loadPopularActors();
+  }, []);
+
+  const saveRecentSearch = (value) => {
+    const next = makeRecentSearchItems(value);
+    setRecentSearches(next);
+  };
+
+  const startVoiceSearch = () => {
+    const recognition = recognitionRef.current;
+    if (!recognition) {
+      setAssistantLine('Voice search is not supported in this browser.');
+      return;
+    }
+
+    try {
+      recognition.start();
+      setIsListening(true);
+    } catch {
+      setIsListening(false);
     }
   };
 
-  const renderStep = () => {
-    switch (step) {
-      case 1:
-        return (
-          <div className="space-y-8 text-center">
-            <div className="flex justify-between items-center gap-4">
-              <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Choose your mood</h2>
+  const inferPersonId = async (actorName) => {
+    if (!actorName) return null;
+
+    const data = await searchPerson(actorName);
+    const candidate = (data?.results || []).find((person) => person?.id);
+    return candidate || null;
+  };
+
+  const fetchRecommendationsForSeed = async (seedItem) => {
+    if (!seedItem?.id || !seedItem?.media_type) return [];
+
+    try {
+      const data = await fetchFromTMDB(`${seedItem.media_type}/${seedItem.id}/recommendations`, {
+        include_adult: false,
+      });
+      return (data.results || []).map((item) => ({ ...item, media_type: seedItem.media_type }));
+    } catch {
+      return [];
+    }
+  };
+
+  const enrichTVSeasons = async (items, maxSeasons) => {
+    if (!maxSeasons) return items;
+
+    const sample = items.slice(0, 20);
+    const detailed = await Promise.all(sample.map(async (item) => {
+      try {
+        const detail = await getTVDetails(item.id);
+        return { ...item, number_of_seasons: detail?.number_of_seasons ?? item.number_of_seasons };
+      } catch {
+        return item;
+      }
+    }));
+
+    return detailed.filter((item) => Number(item.number_of_seasons || 0) <= Number(maxSeasons));
+  };
+
+  const buildParams = (intent, mediaType) => {
+    const params = {
+      include_adult: false,
+      sort_by: 'popularity.desc',
+      'vote_average.gte': intent.ratingMin || (intent.sort === 'rating' ? 7.2 : 0),
+    };
+
+    if (intent.sort === 'rating') params.sort_by = 'vote_average.desc';
+    if (intent.sort === 'popular') params.sort_by = 'popularity.desc';
+    if (intent.sort === 'hidden') {
+      params.sort_by = 'vote_average.desc';
+      params['vote_count.gte'] = 80;
+    }
+
+    const genreIds = intent.genres.map((item) => item.id).filter(Boolean);
+    if (genreIds.length) params.with_genres = [...new Set(genreIds)].join(',');
+
+    if (intent.language) params.with_original_language = intent.language;
+
+    if (intent.maxRuntime && mediaType === 'movie') {
+      params['with_runtime.lte'] = intent.maxRuntime;
+    }
+
+    if (intent.releaseWindow === 'classic') {
+      params.primary_release_date_lte = '1999-12-31';
+      params.first_air_date_lte = '1999-12-31';
+    } else if (intent.releaseWindow === 'modern') {
+      params.primary_release_date_gte = '2000-01-01';
+      params.first_air_date_gte = '2000-01-01';
+    }
+
+    return params;
+  };
+
+  const scoreWithContext = (items, intent) => {
+    const targetGenres = new Set(intent.genres.map((item) => item.id));
+    return items
+      .map((item) => {
+        const itemGenres = new Set(item.genre_ids || []);
+        const sharedGenres = [...targetGenres].filter((genreId) => itemGenres.has(genreId)).length;
+        const rating = Number(item.vote_average || 0);
+        const popularity = Number(item.popularity || 0);
+        const title = `${item.title || item.name || ''} ${item.overview || ''}`.toLowerCase();
+
+        let score = popularity / 100 + rating * 1.8 + sharedGenres * 2.5;
+
+        if (intent.seedTitle) {
+          const seedParts = intent.seedTitle.toLowerCase().split(/\s+/);
+          if (seedParts.some((part) => part.length > 2 && title.includes(part))) score += 4;
+        }
+
+        if (intent.actorName && item.title) score += 0.15;
+        if (intent.sort === 'hidden') score += Math.max(0, 8 - Math.min(item.popularity || 0, 8)) / 2;
+
+        return { ...item, _score: score };
+      })
+      .sort((a, b) => (b._score || 0) - (a._score || 0));
+  };
+
+  const runSearch = async (searchValue = query, options = {}) => {
+    const text = normalizeQuery(searchValue || options.prompt || '');
+    if (!text) {
+      setAssistantLine('Type a vibe, an actor, or a title and I will do the rest.');
+      return;
+    }
+
+    const intent = parseIntent(text);
+    const activeType = options.type || advanced.type || intent.mediaType || 'all';
+    const activeSort = options.sort || advanced.sort || intent.sort;
+    const activeLanguage = options.language ?? advanced.language ?? intent.language;
+    const activeRuntime = options.maxRuntime ?? advanced.maxRuntime ?? intent.maxRuntime;
+    const activeSeasons = options.maxSeasons ?? advanced.maxSeasons ?? intent.maxSeasons;
+    const activeMinRating = options.minRating ?? advanced.minRating ?? intent.ratingMin ?? 0;
+
+    const requestId = ++requestIdRef.current;
+    setLoading(true);
+    setResults([]);
+    setAssistantLine('Thinking through the vibe...');
+
+    try {
+      saveRecentSearch(text);
+
+      const searchSeed = intent.seedTitle || (text.length < 24 ? text : '');
+      const shouldUseSeed = Boolean(searchSeed) && !/\b(movie|series|show|tv)\b/i.test(text);
+      let seedItem = null;
+      let seedRecommendations = [];
+
+      if (shouldUseSeed) {
+        const seedData = await fetchFromTMDB('search/multi', { query: searchSeed, include_adult: false });
+        seedItem = (seedData?.results || []).find((item) => item.media_type === 'movie' || item.media_type === 'tv') || null;
+        seedRecommendations = await fetchRecommendationsForSeed(seedItem);
+      }
+
+      let resolvedActor = null;
+      if (intent.actorName) {
+        try {
+          resolvedActor = await inferPersonId(intent.actorName);
+        } catch {
+          resolvedActor = null;
+        }
+      }
+
+      const normalizedIntent = {
+        ...intent,
+        ratingMin: Number(activeMinRating || intent.ratingMin || 0),
+        language: activeLanguage || intent.language,
+        sort: activeSort,
+        maxRuntime: activeRuntime,
+        maxSeasons: activeSeasons,
+        mediaType: activeType === 'all' ? intent.mediaType : activeType,
+      };
+
+      const movieParams = buildParams(normalizedIntent, 'movie');
+      const tvParams = buildParams(normalizedIntent, 'tv');
+
+      if (resolvedActor?.id) {
+        movieParams.with_cast = resolvedActor.id;
+        tvParams.with_people = resolvedActor.id;
+      }
+
+      const shouldFetchMovies = normalizedIntent.mediaType !== 'tv';
+      const shouldFetchTV = normalizedIntent.mediaType !== 'movie';
+
+      const fetches = [];
+      if (shouldFetchMovies) fetches.push(discoverContent(movieParams));
+      if (shouldFetchTV) fetches.push(discoverTV(tvParams));
+
+      const [movieData, tvData] = await Promise.all(fetches.length ? fetches : [discoverContent(movieParams)]);
+
+      const movieResults = shouldFetchMovies ? ((movieData?.results || []).map((item) => ({ ...item, media_type: 'movie' }))) : [];
+      const tvResults = shouldFetchTV ? ((shouldFetchMovies ? tvData : movieData)?.results || []).map((item) => ({ ...item, media_type: 'tv' })) : [];
+
+      let combined = [...seedRecommendations, ...movieResults, ...tvResults];
+
+      if (normalizedIntent.mediaType === 'tv' && normalizedIntent.maxSeasons) {
+        combined = await enrichTVSeasons(combined.filter((item) => item.media_type === 'tv'), normalizedIntent.maxSeasons);
+      }
+
+      if (resolvedActor?.id) {
+        const personCredits = await getPersonCombinedCredits(resolvedActor.id);
+        const allowedIds = new Set((personCredits?.cast || []).map((item) => item.id));
+        combined = combined.filter((item) => allowedIds.has(item.id) || item.media_type === 'movie' || item.media_type === 'tv');
+      }
+
+      if (normalizedIntent.maxRuntime && normalizedIntent.mediaType !== 'tv') {
+        combined = combined.filter((item) => !item.runtime || Number(item.runtime) <= Number(normalizedIntent.maxRuntime));
+      }
+
+      if (normalizedIntent.maxSeasons && normalizedIntent.mediaType !== 'movie') {
+        combined = combined.filter((item) => item.media_type !== 'tv' || Number(item.number_of_seasons || 0) <= Number(normalizedIntent.maxSeasons));
+      }
+
+      if (normalizedIntent.language) {
+        combined = combined.filter((item) => !item.original_language || item.original_language === normalizedIntent.language);
+      }
+
+      if (Number(normalizedIntent.ratingMin || 0) > 0) {
+        combined = combined.filter((item) => Number(item.vote_average || 0) >= Number(normalizedIntent.ratingMin));
+      }
+
+      if (normalizedIntent.genres.length) {
+        const targetGenres = new Set(normalizedIntent.genres.map((item) => item.id));
+        combined = combined.filter((item) => (item.genre_ids || []).some((genreId) => targetGenres.has(genreId)));
+      }
+
+      const scored = scoreWithContext(uniqueById(combined), normalizedIntent);
+      const finalResults = scored.slice(0, 36);
+
+      if (requestIdRef.current !== requestId) return;
+
+      setResults(finalResults);
+      setIntentPreview(normalizedIntent);
+
+      const summary = buildSummaryLabel(normalizedIntent);
+      setAssistantLine(finalResults.length
+        ? `I found ${finalResults.length} strong matches for ${summary.toLowerCase()}.`
+        : `I could not find a clean match for ${summary.toLowerCase()}. Try making the vibe a little broader.`);
+
+      const enrichedActors = resolvedActor?.name ? [resolvedActor, ...(popularActors || []).filter((person) => person.id !== resolvedActor.id)] : popularActors;
+      setPopularActors(enrichedActors.slice(0, 10));
+
+      if (!finalResults.length && typeof onNoResultsToChat === 'function') {
+        onNoResultsToChat(`I could not find enough strong matches for: "${text}". Help me refine it into a better recommendation.`);
+      }
+    } catch (error) {
+      console.error('Smart finder search failed', error);
+      if (requestIdRef.current !== requestId) return;
+      setResults([]);
+      setAssistantLine('I hit a search limit. Try rewording the vibe or open the assistant chat for a deeper search.');
+      if (typeof onNoResultsToChat === 'function') {
+        onNoResultsToChat(`I could not search "${text}" right now. Please refine it or ask for a simpler vibe.`);
+      }
+    } finally {
+      if (requestIdRef.current === requestId) {
+        setLoading(false);
+      }
+    }
+  };
+
+  const applyPreset = (prompt, type = 'all') => {
+    setQuery(prompt);
+    setAdvanced((prev) => ({ ...prev, type }));
+    runSearch(prompt, { type });
+  };
+
+  const clearQuery = () => {
+    setQuery('');
+    setResults([]);
+    setPredictions([]);
+    setIntentPreview(null);
+    setAssistantLine('Tell me the vibe and I will narrow it down instantly.');
+    textareaRef.current?.focus();
+  };
+
+  const renderSuggestionRail = () => {
+    if (!intentPreview && !query.trim()) {
+      return (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {featuredCollections.map((collection) => (
+            <motion.button
+              key={collection.title}
+              whileHover={{ y: -4, scale: 1.01 }}
+              onClick={() => applyPreset(collection.prompt)}
+              className="group relative overflow-hidden rounded-[1.35rem] border border-white/10 bg-white/4 p-5 text-left shadow-[0_22px_60px_rgba(0,0,0,0.32)] backdrop-blur-xl transition-all"
+            >
+              <div className="absolute inset-0 bg-linear-to-br from-white/8 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+              <div className="relative z-10 flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.24em] text-white/45">AI Playlist</p>
+                  <h3 className="mt-2 text-lg font-semibold text-white">{collection.title}</h3>
+                  <p className="mt-2 max-w-md text-sm leading-6 text-white/65">{collection.subtitle}</p>
+                </div>
+                <div className="rounded-full border border-white/10 bg-white/5 p-3 text-white/70">
+                  <WandSparkles size={18} />
+                </div>
+              </div>
+              <div className="relative z-10 mt-5 flex items-center justify-between text-xs font-semibold uppercase tracking-[0.2em] text-white/55">
+                <span>One click</span>
+                <span className="inline-flex items-center gap-1 text-white/80"><ArrowRight size={12} /> Search</span>
+              </div>
+            </motion.button>
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2 rounded-[1.35rem] border border-white/10 bg-white/4 p-4 shadow-[0_22px_60px_rgba(0,0,0,0.32)] backdrop-blur-xl">
+            <div className="flex flex-wrap items-center gap-2">
+              {(intentPreview?.predictions || predictions || []).map((chip) => (
+                <button
+                  key={chip}
+                  onClick={() => applyPreset(chip)}
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-white/75 transition-all hover:bg-white/10 hover:text-white"
+                >
+                  {chip}
+                </button>
+              ))}
+              {!predictions.length && (
+                <span className="text-xs uppercase tracking-[0.2em] text-white/40">Suggestions will appear as you type</span>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-[1.35rem] border border-white/10 bg-white/4 p-4 shadow-[0_22px_60px_rgba(0,0,0,0.32)] backdrop-blur-xl">
+            <div className="flex items-start gap-3">
+              <div className="rounded-full bg-emerald-500/15 p-3 text-emerald-200">
+                <Stars size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.24em] text-white/40">Assistant readout</p>
+                <p className="mt-1 text-sm leading-6 text-white/80">{assistantLine}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {heroRecommendations.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-white/45">Autocomplete recommendations</p>
               <button
-                onClick={resetFilters}
-                className="px-4 py-2 rounded-full border border-gray-700 text-gray-300 text-xs md:text-sm font-bold uppercase tracking-wider hover:border-gray-500 hover:text-white transition-all"
+                type="button"
+                onClick={() => runSearch(query)}
+                className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60 transition hover:text-white"
               >
-                Clear all filters
+                Search all
               </button>
             </div>
-            <p className="text-gray-400">Pick a mood or skip this step to keep recommendations broad.</p>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {Object.keys(MOOD_GENRES).map((mood) => (
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+              {heroRecommendations.map((item) => (
                 <button
-                  key={mood}
-                  onClick={() => {
-                    updateFilter('mood', mood);
-                    nextStep();
-                  }}
-                  className={`p-6 rounded-xl border-2 transition-all font-bold uppercase tracking-widest ${
-                    filters.mood === mood
-                      ? 'border-red-600 bg-red-600/20 text-white'
-                      : 'border-gray-800 text-gray-400 hover:border-gray-600'
-                  }`}
+                  key={`${item.media_type}-${item.id}`}
+                  onClick={() => handleMovieClick(item, item.media_type)}
+                  className="group overflow-hidden rounded-[1.2rem] border border-white/10 bg-white/4 text-left shadow-[0_18px_50px_rgba(0,0,0,0.25)] transition hover:border-white/20"
                 >
-                  {mood}
+                  <div className="aspect-2/3 bg-slate-900">
+                    {item.poster_path ? (
+                      <img
+                        src={`${POSTER_BASE_URL}${item.poster_path}`}
+                        alt={item.title || item.name}
+                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center bg-linear-to-br from-slate-900 to-slate-800 text-white/40">
+                        <Film size={28} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-1 p-3">
+                    <p className="line-clamp-1 text-sm font-semibold text-white">{item.title || item.name}</p>
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-white/45">
+                      {item.media_type === 'tv' ? 'Series' : 'Movie'} {item.vote_average ? `• ${item.vote_average.toFixed(1)}` : ''}
+                    </p>
+                  </div>
                 </button>
               ))}
             </div>
           </div>
-        );
+        )}
+      </div>
+    );
+  };
 
-      case 2:
-        return (
-          <div className="space-y-8 text-center">
-            <h2 className="text-3xl font-black text-white uppercase tracking-tighter">What do you want to watch?</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {MODE_OPTIONS.map((option) => {
-                const Icon = option.icon;
-                return (
-                  <button
-                    key={option.key}
-                    onClick={() => {
-                      updateFilter('mode', option.key);
-                      updateFilter('contentCategory', option.key === 'movie' ? 'Any Movie' : 'Any Series');
-                      updateFilter('storyFocus', 'any');
-                      nextStep();
-                    }}
-                    className={`p-6 rounded-xl border-2 transition-all flex flex-col items-center gap-3 ${
-                      filters.mode === option.key
-                        ? 'border-red-600 bg-red-600/20 text-white'
-                        : 'border-gray-800 text-gray-400 hover:border-gray-600'
-                    }`}
-                  >
-                    <Icon size={34} />
-                    <span className="font-bold uppercase tracking-widest text-sm">{option.label}</span>
-                  </button>
-                );
-              })}
+  const renderCollections = () => (
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {QUICK_PROMPTS.map((preset) => (
+          <button
+            key={preset.label}
+            onClick={() => applyPreset(preset.prompt)}
+            className={`group rounded-[1.35rem] border border-white/10 bg-linear-to-br ${preset.tone} p-4 text-left shadow-[0_22px_60px_rgba(0,0,0,0.32)] transition hover:-translate-y-1`}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-white/45">AI playlist</p>
+                <h3 className="mt-2 text-lg font-semibold text-white">{preset.label}</h3>
+                <p className="mt-2 text-sm leading-6 text-white/75">Instantly loads a cinematic search with one tap.</p>
+              </div>
+              <div className="rounded-full border border-white/12 bg-black/15 p-3 text-white/80 transition group-hover:bg-white/10">
+                <WandSparkles size={18} />
+              </div>
             </div>
-          </div>
-        );
+          </button>
+        ))}
+      </div>
 
-      case 3:
-        return (
-          <div className="space-y-8 text-center">
-            <h2 className="text-3xl font-black text-white uppercase tracking-tighter">
-              {filters.mode === 'movie' ? 'Movie category' : 'Series category'}
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {categoryOptions.map((item) => (
+      <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
+        <div className="rounded-[1.4rem] border border-white/10 bg-white/4 p-5 shadow-[0_22px_60px_rgba(0,0,0,0.3)] backdrop-blur-xl">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-white/40">Trending moods</p>
+              <h3 className="mt-1 text-lg font-semibold text-white">Search by feeling</h3>
+            </div>
+            <TrendingUp className="text-white/35" size={18} />
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {TRENDING_MOODS.map((item) => {
+              const Icon = item.icon;
+              return (
                 <button
                   key={item.label}
-                  onClick={() => {
-                    updateFilter('contentCategory', item.label);
-                    nextStep();
-                  }}
-                  className={`p-5 rounded-xl border-2 transition-all font-bold uppercase tracking-wider text-sm ${
-                    filters.contentCategory === item.label
-                      ? 'border-red-600 bg-red-600/20 text-white'
-                      : 'border-gray-800 text-gray-400 hover:border-gray-600'
-                  }`}
+                  onClick={() => applyPreset(item.prompt)}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/78 transition hover:bg-white/12 hover:text-white"
                 >
+                  <Icon size={12} />
                   {item.label}
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
-        );
 
-      case 4:
-        return (
-          <div className="space-y-8 text-center">
-            <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Story focus</h2>
-            <p className="text-gray-400">Pick what the main story feels centered around.</p>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {STORY_FOCUS_OPTIONS.map((option) => (
-                <button
-                  key={option.key}
-                  onClick={() => {
-                    updateFilter('storyFocus', option.key);
-                    nextStep();
-                  }}
-                  className={`p-5 rounded-xl border-2 transition-all font-bold uppercase tracking-wider text-sm ${
-                    filters.storyFocus === option.key
-                      ? 'border-red-600 bg-red-600/20 text-white'
-                      : 'border-gray-800 text-gray-400 hover:border-gray-600'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-
-      case 5:
-        return (
-          <div className="space-y-8 text-center">
-            <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Pick genres</h2>
-            <p className="text-gray-400">Choose one or multiple genres.</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {MAIN_GENRES.map((genre) => {
-                const active = filters.selectedGenres.includes(genre.id);
-                return (
+          {recentSearches.length > 0 && (
+            <div className="mt-5">
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-white/40">Recent searches</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {recentSearches.map((item) => (
                   <button
-                    key={genre.id}
-                    onClick={() => toggleGenre(genre.id)}
-                    className={`p-5 rounded-xl border-2 transition-all font-bold uppercase tracking-wider text-sm ${
-                      active
-                        ? 'border-red-600 bg-red-600/20 text-white'
-                        : 'border-gray-800 text-gray-400 hover:border-gray-600'
-                    }`}
+                    key={item}
+                    onClick={() => applyPreset(item)}
+                    className="rounded-full border border-white/10 bg-black/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/70 transition hover:bg-white/10 hover:text-white"
                   >
-                    {genre.label}
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              onClick={nextStep}
-              className="px-8 py-3 bg-red-600 text-white font-black uppercase tracking-widest rounded-full hover:bg-red-700 transition-all"
-            >
-              Continue
-            </button>
-          </div>
-        );
-
-      case 6:
-        return (
-          <div className="space-y-8 text-center">
-            <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Minimum rating</h2>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {[5, 6, 7, 8, 9].map((rating) => (
-                <button
-                  key={rating}
-                  onClick={() => {
-                    updateFilter('rating', rating);
-                    nextStep();
-                  }}
-                  className={`p-6 rounded-xl border-2 transition-all font-bold uppercase tracking-widest ${
-                    filters.rating === rating
-                      ? 'border-red-600 bg-red-600/20 text-white'
-                      : 'border-gray-800 text-gray-400 hover:border-gray-600'
-                  }`}
-                >
-                  <span className="inline-flex items-center gap-1">
-                    <Star size={16} /> {rating}+
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-
-      case 7:
-        return (
-          <div className="space-y-8 text-center">
-            <h2 className="text-3xl font-black text-white uppercase tracking-tighter">
-              {includesTV ? 'Episode or runtime length' : 'Movie runtime'}
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {DURATION_OPTIONS.map((option) => (
-                <button
-                  key={option.key}
-                  onClick={() => {
-                    updateFilter('duration', option.key);
-                    nextStep();
-                  }}
-                  className={`p-5 rounded-xl border-2 transition-all font-bold uppercase tracking-wider text-sm ${
-                    filters.duration === option.key
-                      ? 'border-red-600 bg-red-600/20 text-white'
-                      : 'border-gray-800 text-gray-400 hover:border-gray-600'
-                  }`}
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <Clock size={16} /> {option.label}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-
-      case 8:
-        return (
-          <div className="space-y-8 text-center">
-            <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Series details</h2>
-            <p className="text-gray-400">Set airing status and season count.</p>
-
-            <div className="space-y-4">
-              <h3 className="text-lg font-bold uppercase tracking-widest text-gray-200">Airing status</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {[
-                  { key: 'any', label: 'Any' },
-                  { key: 'airing', label: 'Currently Airing' },
-                  { key: 'completed', label: 'Completed' },
-                ].map((status) => (
-                  <button
-                    key={status.key}
-                    onClick={() => updateFilter('tvStatus', status.key)}
-                    className={`p-5 rounded-xl border-2 transition-all font-bold uppercase tracking-wider text-sm ${
-                      filters.tvStatus === status.key
-                        ? 'border-red-600 bg-red-600/20 text-white'
-                        : 'border-gray-800 text-gray-400 hover:border-gray-600'
-                    }`}
-                  >
-                    {status.label}
+                    <History className="mr-1 inline-block" size={12} />
+                    {item}
                   </button>
                 ))}
               </div>
             </div>
+          )}
+        </div>
 
-            <div className="space-y-4">
-              <h3 className="text-lg font-bold uppercase tracking-widest text-gray-200">Season count</h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {SEASON_OPTIONS.map((option) => (
-                  <button
-                    key={option.key}
-                    onClick={() => updateFilter('seasonRange', option.key)}
-                    className={`p-5 rounded-xl border-2 transition-all font-bold uppercase tracking-wider text-sm ${
-                      filters.seasonRange === option.key
-                        ? 'border-red-600 bg-red-600/20 text-white'
-                        : 'border-gray-800 text-gray-400 hover:border-gray-600'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
+        <div className="rounded-[1.4rem] border border-white/10 bg-white/4 p-5 shadow-[0_22px_60px_rgba(0,0,0,0.3)] backdrop-blur-xl">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-white/40">Because you watched</p>
+              <h3 className="mt-1 text-lg font-semibold text-white">Next best matches</h3>
             </div>
-
-            <button
-              onClick={nextStep}
-              className="px-8 py-3 bg-red-600 text-white font-black uppercase tracking-widest rounded-full hover:bg-red-700 transition-all"
-            >
-              Continue
-            </button>
+            <Sparkles className="text-white/35" size={18} />
           </div>
-        );
 
-      case 9:
-        const visibleActors = actorQuery.trim().length >= 2 ? actorResults : popularActors;
-        const actorSectionTitle = actorQuery.trim().length >= 2 ? 'Search results' : 'Popular actors';
-
-        return (
-          <div className="space-y-8 text-center">
-            <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Choose actor or actress</h2>
-            <p className="text-gray-400">Search and pick a profile. Results will include only titles featuring that person.</p>
-
-            <div className="max-w-3xl mx-auto space-y-6">
-              <div className="relative">
-                <Users className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
-                <input
-                  type="text"
-                  value={actorQuery}
-                  onChange={(e) => {
-                    setActorQuery(e.target.value);
-                    if (!e.target.value.trim()) {
-                      updateFilter('personId', null);
-                      updateFilter('personName', '');
-                    }
-                  }}
-                  placeholder="Search actor profiles (e.g. Shah Rukh Khan, Emma Stone)"
-                  className="w-full bg-white/5 border-2 border-gray-800 rounded-xl py-4 pl-12 pr-4 text-white outline-none focus:border-red-600 transition-all"
-                />
-              </div>
-
-              {filters.personId && (
-                <div className="flex items-center justify-between bg-white/5 border border-red-500/40 rounded-2xl px-4 py-3">
-                  <div className="text-left">
-                    <p className="text-xs uppercase tracking-widest text-gray-400">Selected profile</p>
-                    <p className="text-white font-bold">{filters.personName}</p>
-                  </div>
-                  <button
-                    onClick={clearActorSelection}
-                    className="px-3 py-2 rounded-full text-xs font-bold uppercase tracking-wider border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 transition-all"
-                  >
-                    Remove
-                  </button>
-                </div>
-              )}
-
-              {actorLoading && <p className="text-gray-400 text-sm">Searching profiles...</p>}
-
-              {!actorLoading && visibleActors.length > 0 && (
-                <div className="space-y-4">
-                  <p className="text-left text-gray-300 font-bold uppercase tracking-widest text-sm">{actorSectionTitle}</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-                    {visibleActors.map((person) => {
-                      const active = filters.personId === person.id;
-                      const imageUrl = person.profile_path ? `${POSTER_BASE_URL}${person.profile_path}` : '';
-                      return (
-                        <button
-                          key={person.id}
-                          onClick={() => selectActor(person)}
-                          className={`p-3 rounded-2xl border-2 transition-all text-center ${
-                            active ? 'border-red-600 bg-red-600/20 text-white' : 'border-gray-800 text-gray-300 hover:border-gray-600'
-                          }`}
-                        >
-                          <div className="w-20 h-20 mx-auto rounded-full overflow-hidden bg-gray-900 border border-gray-700">
-                            {imageUrl ? (
-                              <img src={imageUrl} alt={person.name} className="w-full h-full object-cover" loading="lazy" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs font-bold">NO IMG</div>
-                            )}
-                          </div>
-                          <p className="mt-2 text-xs font-bold leading-tight line-clamp-2">{person.name}</p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {!actorLoading && filters.personId && relatedActors.length > 0 && (
-                <div className="space-y-4">
-                  <p className="text-left text-gray-300 font-bold uppercase tracking-widest text-sm">Related profiles</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-                    {relatedActors.map((person) => {
-                      const imageUrl = person.profile_path ? `${POSTER_BASE_URL}${person.profile_path}` : '';
-                      return (
-                        <button
-                          key={`related-${person.id}`}
-                          onClick={() => selectActor(person)}
-                          className="p-3 rounded-2xl border-2 border-gray-800 text-gray-300 hover:border-gray-600 transition-all text-center"
-                        >
-                          <div className="w-16 h-16 mx-auto rounded-full overflow-hidden bg-gray-900 border border-gray-700">
-                            {imageUrl ? (
-                              <img src={imageUrl} alt={person.name} className="w-full h-full object-cover" loading="lazy" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs font-bold">NO IMG</div>
-                            )}
-                          </div>
-                          <p className="mt-2 text-xs font-bold leading-tight line-clamp-2">{person.name}</p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
+          <div className="mt-4 space-y-3">
+            {becauseYouWatched.length > 0 ? becauseYouWatched.slice(0, 4).map((item) => (
               <button
-                onClick={nextStep}
-                className="w-full py-4 bg-red-600 text-white font-black uppercase tracking-widest rounded-xl hover:bg-red-700 transition-all"
+                key={`${item.media_type}-${item.id}`}
+                onClick={() => handleMovieClick(item, item.media_type)}
+                className="flex w-full items-center gap-3 rounded-2xl border border-white/8 bg-black/10 p-2 text-left transition hover:bg-white/8"
               >
-                {filters.personId ? 'Use selected profile' : 'Continue without actor'}
+                <div className="h-14 w-10 overflow-hidden rounded-xl bg-slate-900">
+                  {item.poster_path ? (
+                    <img src={`${POSTER_BASE_URL}${item.poster_path}`} alt={item.title || item.name} className="h-full w-full object-cover" loading="lazy" />
+                  ) : null}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-white">{item.title || item.name}</p>
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-white/45">
+                    {getGenreLabels(item.genre_ids).join(' • ') || (item.media_type === 'tv' ? 'Series' : 'Movie')}
+                  </p>
+                </div>
               </button>
-            </div>
-          </div>
-        );
-
-      case 10:
-        return (
-          <div className="space-y-8 text-center">
-            <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Preferred language</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              {LANGUAGE_OPTIONS.map((lang) => (
-                <button
-                  key={`${lang.code || 'any'}-${lang.name}`}
-                  onClick={() => {
-                    updateFilter('language', lang.code);
-                    nextStep();
-                  }}
-                  className={`p-5 rounded-xl border-2 transition-all font-bold uppercase tracking-wider text-sm ${
-                    filters.language === lang.code
-                      ? 'border-red-600 bg-red-600/20 text-white'
-                      : 'border-gray-800 text-gray-400 hover:border-gray-600'
-                  }`}
-                >
-                  {lang.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-
-      case 11:
-        return (
-          <div className="space-y-8 text-center">
-            <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Release era</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {ERA_OPTIONS.map((era) => (
-                <button
-                  key={era.key}
-                  onClick={() => updateFilter('era', era.key)}
-                  className={`p-5 rounded-xl border-2 transition-all font-bold uppercase tracking-wider text-sm ${
-                    filters.era === era.key
-                      ? 'border-red-600 bg-red-600/20 text-white'
-                      : 'border-gray-800 text-gray-400 hover:border-gray-600'
-                  }`}
-                >
-                  {era.label}
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={runFinder}
-              className="inline-flex items-center gap-2 px-10 py-4 bg-red-600 text-white font-black uppercase tracking-widest rounded-full hover:bg-red-700 transition-all"
-            >
-              <Search size={18} /> Find Titles
-            </button>
-          </div>
-        );
-
-      case 12:
-        return (
-          <div className="space-y-8">
-            <div className="flex items-center justify-between">
-              <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Recommendations for you</h2>
-              <button
-                onClick={() => {
-                  setResults([]);
-                  setStep(1);
-                }}
-                className="text-red-600 font-bold uppercase tracking-widest hover:underline"
-              >
-                Reset Filters
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-              {results.map((item) => (
-                <MovieCard
-                  key={`${item.media_type || 'movie'}-${item.id}`}
-                  movie={item}
-                  onClick={onMovieClick}
-                  isTV={item.media_type === 'tv'}
-                  onToggleList={onToggleList}
-                  isInList={myList?.some((m) => m.id === item.id)}
-                />
-              ))}
-            </div>
-
-            {results.length === 0 && (
-              <div className="text-center py-20 text-gray-500">
-                <p className="text-xl">No exact matches found for your filters.</p>
-                <p className="mt-2 text-sm text-gray-400">We redirected you to AI chat so you can refine your request by typing or using the mic.</p>
+            )) : (
+              <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 p-4 text-sm text-white/55">
+                Add titles to My List and I will shape recommendations around your taste.
               </div>
             )}
           </div>
-        );
+        </div>
+      </div>
 
-      default:
-        return null;
-    }
-  };
+      <div className="grid gap-4 lg:grid-cols-3">
+        {featuredCollections.map((collection) => (
+          <div key={collection.title} className="rounded-[1.4rem] border border-white/10 bg-white/4 p-5 shadow-[0_22px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.24em] text-white/40">Playlist</p>
+                <h3 className="mt-1 text-lg font-semibold text-white">{collection.title}</h3>
+              </div>
+              <button
+                onClick={() => applyPreset(collection.prompt)}
+                className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/75 transition hover:bg-white/10 hover:text-white"
+              >
+                <Play size={12} />
+                Play
+              </button>
+            </div>
+            <p className="mt-2 text-sm leading-6 text-white/60">{collection.subtitle}</p>
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              {collection.items.slice(0, 3).map((item) => (
+                <button key={`${collection.title}-${item.id}`} onClick={() => handleMovieClick(item, item.media_type || 'movie')} className="overflow-hidden rounded-2xl border border-white/8 bg-black/10">
+                  <div className="aspect-2/3">
+                    {item.poster_path ? <img src={`${POSTER_BASE_URL}${item.poster_path}`} alt={item.title || item.name} className="h-full w-full object-cover" loading="lazy" /> : null}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-100 bg-black/95 flex flex-col p-4 md:p-12 overflow-y-auto"
+      className="fixed inset-0 z-100 overflow-y-auto bg-black/92 px-4 py-4 backdrop-blur-xl md:px-8 md:py-8"
     >
-      <div className="flex justify-between items-center mb-12">
-        <div className="flex items-center gap-3 text-red-600">
-          <Sparkles size={32} />
-          <h1 className="text-2xl font-black uppercase tracking-widest">Smart Finder</h1>
-        </div>
+      <div className="mx-auto flex min-h-full w-full max-w-368 flex-col overflow-hidden rounded-4xl border border-white/10 bg-linear-to-b from-[#0c0c12]/96 via-[#0a0a0f]/94 to-black/96 shadow-[0_40px_120px_rgba(0,0,0,0.78)]">
+        <div className="flex flex-col gap-4 border-b border-white/10 bg-white/3 px-5 py-4 md:px-7 md:py-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-linear-to-br from-red-500/30 to-amber-400/20 text-white shadow-[0_0_24px_rgba(239,68,68,0.25)]">
+                <Sparkles size={20} />
+              </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-white/40">AI-powered discovery</p>
+                <h1 className="text-2xl font-black tracking-tight text-white md:text-3xl">Smart Finder</h1>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-white/55">
+                  Ask naturally. I will infer vibe, genre, actor, runtime, language, and whether you want a movie or a series.
+                </p>
+              </div>
+            </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => {
-              if (onPreferenceSearch) onPreferenceSearch();
-              onClose();
-            }}
-            className="px-4 py-2 rounded-lg bg-emerald-600/20 border border-emerald-500/50 text-emerald-300 text-xs md:text-sm font-bold uppercase tracking-wider hover:bg-emerald-600/30 transition-all"
-          >
-            Use Saved Preferences
-          </button>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
-            <X size={32} />
-          </button>
-        </div>
-      </div>
-
-      <div className="max-w-6xl mx-auto w-full">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-40 gap-6">
-            <div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
-            <p className="text-gray-400 font-bold uppercase tracking-widest animate-pulse">Finding the perfect match...</p>
+            <div className="flex flex-wrap items-center gap-2">
+              {onPreferenceSearch && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onPreferenceSearch();
+                    onClose();
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200 transition hover:bg-emerald-500/18"
+                >
+                  <Stars size={14} />
+                  Saved Preferences
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white"
+                aria-label="Close Smart Finder"
+              >
+                <X size={18} />
+              </button>
+            </div>
           </div>
-        ) : (
-          renderStep()
+
+          <div className="grid gap-3 lg:grid-cols-[1.35fr_0.65fr]">
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                runSearch();
+              }}
+              className="relative"
+            >
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/35">
+                <Search size={20} />
+              </div>
+              <input
+                ref={textareaRef}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={placeholder}
+                className="h-16 w-full rounded-[1.35rem] border border-white/10 bg-white/6 pl-12 pr-32 text-base text-white outline-none ring-0 placeholder:text-white/30 focus:border-red-400/30 focus:bg-white/8.5"
+              />
+
+              <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={startVoiceSearch}
+                  className={`inline-flex h-11 w-11 items-center justify-center rounded-full border transition ${isListening ? 'border-red-400/40 bg-red-500/18 text-red-100' : 'border-white/10 bg-white/6 text-white/70 hover:bg-white/10 hover:text-white'}`}
+                  aria-label="Voice search"
+                >
+                  {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+                </button>
+                <button
+                  type="submit"
+                  className="inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-sm font-bold uppercase tracking-[0.18em] text-black transition hover:scale-[1.02]"
+                >
+                  <Search size={14} />
+                  Search
+                </button>
+              </div>
+            </form>
+
+            <div className="grid grid-cols-2 gap-2 lg:grid-cols-1 xl:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced((prev) => !prev)}
+                className="inline-flex items-center justify-center gap-2 rounded-[1.15rem] border border-white/10 bg-white/5 px-4 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-white/75 transition hover:bg-white/9 hover:text-white"
+              >
+                <SlidersHorizontal size={14} />
+                {showAdvanced ? 'Hide Refine' : 'Refine'}
+              </button>
+              <button
+                type="button"
+                onClick={clearQuery}
+                className="inline-flex items-center justify-center gap-2 rounded-[1.15rem] border border-white/10 bg-white/5 px-4 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-white/75 transition hover:bg-white/9 hover:text-white"
+              >
+                <RefreshCw size={14} />
+                Reset
+              </button>
+            </div>
+          </div>
+
+          {intentPreview?.predictions?.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-[0.24em] text-white/35">Detected</span>
+              {intentPreview.predictions.map((chip) => (
+                <span key={chip} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">
+                  {chip}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2">
+            {QUICK_PROMPTS.slice(0, 4).map((chip) => (
+              <button
+                key={chip.label}
+                type="button"
+                onClick={() => applyPreset(chip.prompt)}
+                className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/74 transition hover:bg-white/10 hover:text-white"
+              >
+                {chip.label}
+              </button>
+            ))}
+            <div className="ml-auto flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/35">
+              <Clock3 size={12} />
+              Fast natural language search
+            </div>
+          </div>
+        </div>
+
+        <AnimatePresence>
+          {showAdvanced && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.22 }}
+              className="overflow-hidden border-b border-white/10 bg-black/20"
+            >
+              <div className="grid gap-4 px-5 py-5 md:px-7 lg:grid-cols-5">
+                <div className="space-y-2">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-white/40">Type</p>
+                  <div className="flex flex-wrap gap-2">
+                    {TYPE_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          setAdvanced((prev) => ({ ...prev, type: option.value }));
+                          setQuickType(option.value);
+                        }}
+                        className={`rounded-full border px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition ${advanced.type === option.value || quickType === option.value ? 'border-white/30 bg-white text-black' : 'border-white/10 bg-white/4 text-white/70 hover:bg-white/8 hover:text-white'}`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-white/40">Sort</p>
+                  <div className="flex flex-wrap gap-2">
+                    {SORT_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setAdvanced((prev) => ({ ...prev, sort: option.value }))}
+                        className={`rounded-full border px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition ${advanced.sort === option.value ? 'border-white/30 bg-white text-black' : 'border-white/10 bg-white/4 text-white/70 hover:bg-white/8 hover:text-white'}`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-white/40">Language</p>
+                  <select
+                    value={advanced.language}
+                    onChange={(event) => setAdvanced((prev) => ({ ...prev, language: event.target.value }))}
+                    className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none"
+                  >
+                    {LANGUAGE_OPTIONS.map((option) => (
+                      <option key={option.value || 'any'} value={option.value} className="bg-[#111] text-white">
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-white/40">Minimum rating</p>
+                  <div className="flex flex-wrap gap-2">
+                    {[0, 6, 7, 8].map((rating) => (
+                      <button
+                        key={rating}
+                        type="button"
+                        onClick={() => setAdvanced((prev) => ({ ...prev, minRating: rating }))}
+                        className={`rounded-full border px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition ${Number(advanced.minRating) === rating ? 'border-white/30 bg-white text-black' : 'border-white/10 bg-white/4 text-white/70 hover:bg-white/8 hover:text-white'}`}
+                      >
+                        {rating === 0 ? 'Any' : `${rating}+`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-white/40">Runtime</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['', 90, 120, 150].map((runtime) => (
+                      <button
+                        key={String(runtime || 'any')}
+                        type="button"
+                        onClick={() => setAdvanced((prev) => ({ ...prev, maxRuntime: runtime }))}
+                        className={`rounded-full border px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition ${String(advanced.maxRuntime || '') === String(runtime || '') ? 'border-white/30 bg-white text-black' : 'border-white/10 bg-white/4 text-white/70 hover:bg-white/8 hover:text-white'}`}
+                      >
+                        {runtime ? `Under ${runtime}m` : 'Any'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-white/40">Series</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['', 2, 4, 6].map((seasons) => (
+                      <button
+                        key={String(seasons || 'any')}
+                        type="button"
+                        onClick={() => setAdvanced((prev) => ({ ...prev, maxSeasons: seasons }))}
+                        className={`rounded-full border px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition ${String(advanced.maxSeasons || '') === String(seasons || '') ? 'border-white/30 bg-white text-black' : 'border-white/10 bg-white/4 text-white/70 hover:bg-white/8 hover:text-white'}`}
+                      >
+                        {seasons ? `Under ${seasons}` : 'Any'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={() => setAdvanced(DEFAULT_ADVANCED)}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/4 px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-white/80 transition hover:bg-white/9 hover:text-white"
+                  >
+                    <RefreshCw size={14} />
+                    Clear Refine
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="flex-1 px-5 py-5 md:px-7 md:py-6">
+          {loading ? (
+            <div className="flex min-h-[40vh] flex-col items-center justify-center gap-5 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-[0_0_25px_rgba(255,255,255,0.08)]">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+              </div>
+              <div>
+                <p className="text-lg font-semibold text-white">Finding the right vibe</p>
+                <p className="mt-1 text-sm text-white/55">I am mapping your prompt into genres, moods, and audience fit.</p>
+              </div>
+            </div>
+          ) : results.length > 0 ? (
+            <div className="space-y-7">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-white/40">Results</p>
+                  <h2 className="mt-1 text-2xl font-black tracking-tight text-white md:text-3xl">{assistantLine}</h2>
+                </div>
+                <button
+                  onClick={() => runSearch(query)}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/75 transition hover:bg-white/9 hover:text-white"
+                >
+                  <RefreshCw size={14} />
+                  Refresh search
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                {results.map((item) => (
+                  <MovieCard
+                    key={`${item.media_type || 'movie'}-${item.id}`}
+                    movie={item}
+                    onClick={onMovieClick}
+                    isTV={item.media_type === 'tv'}
+                    onToggleList={onToggleList}
+                    isInList={myList?.some((m) => m.id === item.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : query.trim() ? (
+            <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4 text-center">
+              <div className="rounded-full border border-white/10 bg-white/5 p-4 text-white/70">
+                <Brain size={24} />
+              </div>
+              <div>
+                <p className="text-xl font-semibold text-white">No exact match yet</p>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-white/55">
+                  Try adding a mood, the word movie or series, or a title reference like “like Fight Club”. I can also search by actor, runtime, language, or vibe.
+                </p>
+              </div>
+            </div>
+          ) : (
+            renderCollections()
+          )}
+        </div>
+
+        {query.trim() && (
+          <div className="border-t border-white/10 bg-white/3 px-5 py-4 md:px-7">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-[0.24em] text-white/35">Suggestions</span>
+              {predictions.length > 0 ? predictions.map((chip) => (
+                <button
+                  key={chip}
+                  type="button"
+                  onClick={() => applyPreset(chip)}
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/75 transition hover:bg-white/10 hover:text-white"
+                >
+                  {chip}
+                </button>
+              )) : (
+                <span className="text-sm text-white/50">Try “emotional sci-fi movies”, “family movie for dinner”, or “best crime series under 2 seasons”.</span>
+              )}
+            </div>
+          </div>
         )}
       </div>
-
-      {step >= 1 && step < 12 && !loading && (
-        <div className="mt-8 pb-6 flex justify-center gap-3 md:gap-4 flex-wrap">
-          {step > 1 && (
-            <button
-              onClick={prevStep}
-              className="px-8 py-3 rounded-full bg-gray-800 text-white font-bold uppercase tracking-widest hover:bg-gray-700 transition-colors"
-            >
-              Back
-            </button>
-          )}
-          <button
-            onClick={skipCurrentStep}
-            className="px-8 py-3 rounded-full bg-white/10 border border-gray-700 text-gray-200 font-bold uppercase tracking-widest hover:bg-white/20 transition-colors"
-          >
-            {step === 11 ? 'Skip & Find' : 'Skip'}
-          </button>
-        </div>
-      )}
     </motion.div>
   );
 }
