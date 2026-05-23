@@ -7,8 +7,10 @@ import MovieCard from './components/MovieCard';
 import LandingPage from './components/LandingPage';
 import AuthPage from './components/AuthPage';
 import AgeVerification from './components/AgeVerification';
+import AuthGateModal from './components/AuthGateModal';
 import { GoogleGenAI } from "@google/genai";
-import { Github, Instagram, Linkedin } from 'lucide-react';import { 
+import { Github, Instagram, Linkedin, Lock, Sparkles, ShieldCheck } from 'lucide-react';
+import {
   getMovieDetails,
   getTVDetails,
   discoverTV,
@@ -50,6 +52,44 @@ const PrivacyPolicy = lazy(() => import('./components/InfoPages/PrivacyPolicy'))
 const TermsOfService = lazy(() => import('./components/InfoPages/TermsOfService'));
 const AboutPage = lazy(() => import('./components/InfoPages/AboutPage'));
 const ContactPage = lazy(() => import('./components/InfoPages/ContactPage'));
+
+const AUTH_GATE_COPY = {
+  smartFinder: {
+    title: 'Unlock smart movie discovery',
+    message: 'Sign in to use the conversational AI assistant, advanced smart finder, and AI-powered recommendations built around your taste.',
+    cta: 'Sign in to unlock AI-powered recommendations',
+  },
+  watchlist: {
+    title: 'Save your watchlist across devices',
+    message: 'Create a free account to save titles, favorites, and continue watching wherever you log in.',
+    cta: 'Create your personalized movie universe',
+  },
+  settings: {
+    title: 'Personalize your experience',
+    message: 'Sign in to unlock profile customization, saved preferences, notifications, and premium discovery controls.',
+    cta: 'Sign in to personalize CineMatch',
+  },
+  chat: {
+    title: 'Unlock AI movie assistant',
+    message: 'Sign in to use CineChat, guided recommendations, and intelligent follow-up suggestions.',
+    cta: 'Unlock AI recommendations',
+  },
+  profile: {
+    title: 'Create your profile',
+    message: 'Sign in to add avatars, customize your profile, and keep your movie identity synced.',
+    cta: 'Sign in to continue',
+  },
+  preferences: {
+    title: 'Unlock saved preferences',
+    message: 'Save actors, genres, and discovery habits to get stronger recommendations every time you return.',
+    cta: 'Sign in to save preferences',
+  },
+  notifications: {
+    title: 'Turn on notifications',
+    message: 'Sign in to receive watch reminders, new matches, and premium discovery alerts.',
+    cta: 'Sign in to enable notifications',
+  },
+};
 
 function decodeBase64UrlJson(value) {
   const normalized = String(value || '')
@@ -126,6 +166,8 @@ export default function App() {
   const [showCompare, setShowCompare] = useState(false);
   const [showMyList, setShowMyList] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showAuthGate, setShowAuthGate] = useState(false);
+  const [pendingUnlockFeature, setPendingUnlockFeature] = useState(null);
   const [settingsTab, setSettingsTab] = useState('preferences');
   const [infoPage, setInfoPage] = useState(null); // 'privacy' | 'terms' | 'about' | 'contact'
   const [themeMode, setThemeMode] = useState(() => localStorage.getItem('cineMatch_themeMode') || 'default');
@@ -163,6 +205,35 @@ export default function App() {
 
   const [error, setError] = useState(null);
   const [contentLoading, setContentLoading] = useState(true);
+
+  const openAuthGate = (featureKey) => {
+    setPendingUnlockFeature(featureKey);
+    setShowAuthGate(true);
+  };
+
+  const openFeatureAfterAuth = (featureKey) => {
+    switch (featureKey) {
+      case 'smartFinder':
+        setShowSmartFinder(true);
+        break;
+      case 'watchlist':
+        setShowMyList(true);
+        break;
+      case 'settings':
+      case 'preferences':
+        setSettingsTab('preferences');
+        setShowSettings(true);
+        break;
+      case 'chat':
+        setShowChat(true);
+        break;
+      case 'profile':
+        setShowManageProfile(true);
+        break;
+      default:
+        break;
+    }
+  };
 
   // ===== ALL EFFECTS MUST COME AFTER ALL STATES =====
 
@@ -458,6 +529,11 @@ export default function App() {
   };
 
   const toggleMyList = (movie) => {
+    if (!isAuthenticated) {
+      openAuthGate('watchlist');
+      return;
+    }
+
     setMyList(prev => {
       const exists = prev.find(m => m.id === movie.id);
       if (exists) {
@@ -489,7 +565,14 @@ export default function App() {
     setCurrentUser(user);
     setIsAuthenticated(true);
     setShowAuth(false);
+    setShowAuthGate(false);
     setAuthErrorMessage('');
+
+    const nextFeature = pendingUnlockFeature;
+    setPendingUnlockFeature(null);
+    if (nextFeature) {
+      queueMicrotask(() => openFeatureAfterAuth(nextFeature));
+    }
   };
 
   const handleLogout = () => {
@@ -497,9 +580,16 @@ export default function App() {
     setIsAuthenticated(false);
     setCurrentUser(null);
     setShowAuth(false);
+    setShowAuthGate(false);
+    setPendingUnlockFeature(null);
   };
 
   const openChat = (seedMessage = '') => {
+    if (!isAuthenticated) {
+      openAuthGate('chat');
+      return;
+    }
+
     setChatSeedMessage(seedMessage);
     setShowChat(true);
   };
@@ -510,10 +600,20 @@ export default function App() {
   };
 
   const markAllNotificationsRead = () => {
+    if (!isAuthenticated) {
+      openAuthGate('notifications');
+      return;
+    }
+
     setNotifications(prev => prev.map(item => ({ ...item, read: true })));
   };
 
   const openSettingsTab = (tab = 'preferences') => {
+    if (!isAuthenticated) {
+      openAuthGate(tab === 'preferences' ? 'preferences' : 'settings');
+      return;
+    }
+
     setSettingsTab(tab);
     setShowSettings(true);
   };
@@ -682,6 +782,11 @@ export default function App() {
   };
 
   const handlePreferenceSearch = async (prefsOverride = null) => {
+    if (!isAuthenticated) {
+      openAuthGate('preferences');
+      return;
+    }
+
     setIsSearching(true);
     setSearchError(null);
     setSearchResults(null);
@@ -794,6 +899,33 @@ export default function App() {
     handleMovieClick(random);
   };
 
+  const openSmartFinder = () => {
+    if (!isAuthenticated) {
+      openAuthGate('smartFinder');
+      return;
+    }
+
+    setShowSmartFinder(true);
+  };
+
+  const openMyList = () => {
+    if (!isAuthenticated) {
+      openAuthGate('watchlist');
+      return;
+    }
+
+    setShowMyList(true);
+  };
+
+  const openManageProfile = () => {
+    if (!isAuthenticated) {
+      openAuthGate('profile');
+      return;
+    }
+
+    setShowManageProfile(true);
+  };
+
   const getLanguageName = (code) => {
     const languagesMap = {
       'hi': 'Hindi', 'ta': 'Tamil', 'te': 'Telugu', 'kn': 'Kannada', 'ml': 'Malayalam', 'pa': 'Punjabi', 'bn': 'Bengali',
@@ -902,17 +1034,17 @@ export default function App() {
         <Navbar 
           onSearch={handleSearch}
           onHome={resetToHome}
-          onSmartFinder={() => setShowSmartFinder(true)} 
+          onSmartFinder={openSmartFinder} 
           onPreferenceSearch={handlePreferenceSearch}
           onCompare={() => setShowCompare(true)}
           onSurpriseMe={handleSurpriseMe}
-          onMyList={() => setShowMyList(true)}
+          onMyList={openMyList}
           onSettings={() => openSettingsTab('preferences')}
           onPreferences={() => openSettingsTab('preferences')}
           onTheme={() => openSettingsTab('theme')}
           onAccount={() => openSettingsTab('account')}
           onChat={() => openChat()}
-          onManageProfile={() => setShowManageProfile(true)}
+          onManageProfile={openManageProfile}
           selectedCountry={selectedCountry}
           onCountryChange={handleCountryChange}
           browseType={browseType}
@@ -920,6 +1052,7 @@ export default function App() {
           selectedLanguage={selectedLanguage}
           onLanguageChange={setSelectedLanguage}
           currentUser={currentUser}
+          isAuthenticated={isAuthenticated}
           onLogout={handleLogout}
           onLogin={() => setShowAuth(true)}
           notifications={notifications}
@@ -944,17 +1077,17 @@ export default function App() {
       <Navbar 
         onSearch={handleSearch}
         onHome={resetToHome}
-        onSmartFinder={() => setShowSmartFinder(true)} 
+        onSmartFinder={openSmartFinder} 
         onPreferenceSearch={handlePreferenceSearch}
         onCompare={() => setShowCompare(true)}
         onSurpriseMe={handleSurpriseMe}
-        onMyList={() => setShowMyList(true)}
+        onMyList={openMyList}
         onSettings={() => openSettingsTab('preferences')}
         onPreferences={() => openSettingsTab('preferences')}
         onTheme={() => openSettingsTab('theme')}
         onAccount={() => openSettingsTab('account')}
         onChat={() => openChat()}
-        onManageProfile={() => setShowManageProfile(true)}
+        onManageProfile={openManageProfile}
         selectedCountry={selectedCountry}
         onCountryChange={handleCountryChange}
         browseType={browseType}
@@ -962,6 +1095,7 @@ export default function App() {
         selectedLanguage={selectedLanguage}
         onLanguageChange={setSelectedLanguage}
         currentUser={currentUser}
+        isAuthenticated={isAuthenticated}
         onLogout={handleLogout}
         onLogin={() => setShowAuth(true)}
         notifications={notifications}
@@ -1031,7 +1165,7 @@ export default function App() {
             ) : searchResults.results.length > 0 ? (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                 {searchResults.results.map(movie => (
-                  <MovieCard key={movie.id} movie={movie} onClick={handleMovieClick} isTV={movie.media_type === 'tv'} onToggleList={toggleMyList} isInList={myList?.some(m => m.id === movie.id)} />
+                  <MovieCard key={movie.id} movie={movie} onClick={handleMovieClick} isTV={movie.media_type === 'tv'} onToggleList={toggleMyList} isInList={myList?.some(m => m.id === movie.id)} isAuthenticated={isAuthenticated} onRequireAuth={openAuthGate} />
                 ))}
               </div>
             ) : (
@@ -1067,69 +1201,110 @@ export default function App() {
               }}
             />
 
-            <div className="section-shell -mt-10 md:-mt-14 relative z-30 pb-2">
-              <div className="grid gap-4 lg:grid-cols-[1.35fr_0.75fr]">
-                <div className="glass-panel rounded-[2rem] p-6 md:p-8">
-                  <p className="section-kicker">Retention hub</p>
-                  <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-                    <div>
-                      <h2 className="section-title text-white">Continue where you left off.</h2>
-                      <p className="section-copy mt-3 text-sm md:text-base">
-                        Pick up saved titles, revisit the strongest matches, and keep your watchlist warm without hunting through clutter.
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70">Continue Watching</span>
-                      <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70">Because You Watched</span>
-                      <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70">Mood Picks</span>
+            {!isAuthenticated ? (
+              <div className="section-shell -mt-10 md:-mt-14 relative z-30 pb-2">
+                <div className="grid gap-4 lg:grid-cols-[1.35fr_0.75fr]">
+                  <div className="glass-panel rounded-[2rem] p-6 md:p-8">
+                    <p className="section-kicker">Premium discovery</p>
+                    <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                      <div>
+                        <h2 className="section-title text-white">Create your personalized movie universe.</h2>
+                        <p className="section-copy mt-3 text-sm md:text-base">
+                          Sign in to unlock AI recommendations, Smart Finder, your watchlist, saved preferences, and continue watching across devices.
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70"><Lock size={12} /> AI tools</span>
+                        <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70"><Lock size={12} /> Watchlist sync</span>
+                        <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70"><Lock size={12} /> Saved prefs</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-                  <div className="glass-panel card-lift rounded-[2rem] p-5">
-                    <p className="section-kicker">AI assistant</p>
-                    <h3 className="mt-3 text-xl font-semibold text-white">Ask for a mood, genre, or runtime.</h3>
-                    <p className="mt-2 text-sm leading-6 text-white/55">The assistant can surface recommendations, build watchlists, and keep discovery feel personal.</p>
-                  </div>
-                  <div className="glass-panel card-lift rounded-[2rem] p-5">
-                    <p className="section-kicker">Monetization</p>
-                    <h3 className="mt-3 text-xl font-semibold text-white">Affiliate rails and sponsored rows.</h3>
-                    <p className="mt-2 text-sm leading-6 text-white/55">Keep recommendations clean while blending in premium links to major OTT platforms.</p>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+                    <button type="button" onClick={() => setShowAuth(true)} className="glass-panel card-lift rounded-[2rem] p-5 text-left transition hover:-translate-y-1">
+                      <p className="section-kicker">Sign up reason</p>
+                      <h3 className="mt-3 text-xl font-semibold text-white">Unlock AI-powered recommendations.</h3>
+                      <p className="mt-2 text-sm leading-6 text-white/55">Create a profile, save favorites, and keep your discovery journey personalized.</p>
+                    </button>
+                    <button type="button" onClick={() => setShowAuth(true)} className="glass-panel card-lift rounded-[2rem] p-5 text-left transition hover:-translate-y-1">
+                      <p className="section-kicker">Smooth onboarding</p>
+                      <h3 className="mt-3 text-xl font-semibold text-white">Continue with Google or email.</h3>
+                      <p className="mt-2 text-sm leading-6 text-white/55">Join in seconds and unlock the cinematic premium experience.</p>
+                    </button>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <>
+                <div className="section-shell -mt-10 md:-mt-14 relative z-30 pb-2">
+                  <div className="grid gap-4 lg:grid-cols-[1.35fr_0.75fr]">
+                    <div className="glass-panel rounded-[2rem] p-6 md:p-8">
+                      <p className="section-kicker">Retention hub</p>
+                      <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                        <div>
+                          <h2 className="section-title text-white">Continue where you left off.</h2>
+                          <p className="section-copy mt-3 text-sm md:text-base">
+                            Pick up saved titles, revisit the strongest matches, and keep your watchlist warm without hunting through clutter.
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70">Continue Watching</span>
+                          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70">Because You Watched</span>
+                          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70">Mood Picks</span>
+                        </div>
+                      </div>
+                    </div>
 
-            <MovieRow
-              title="Continue Watching"
-              eyebrow="Home base"
-              description="Resume saved titles and unfinished trailers from where users left off."
-              movies={continueWatchingMovies}
-              onMovieClick={handleMovieClick}
-              onToggleList={toggleMyList}
-              myList={myList}
-            />
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+                      <div className="glass-panel card-lift rounded-[2rem] p-5">
+                        <p className="section-kicker">AI assistant</p>
+                        <h3 className="mt-3 text-xl font-semibold text-white">Ask for a mood, genre, or runtime.</h3>
+                        <p className="mt-2 text-sm leading-6 text-white/55">The assistant can surface recommendations, build watchlists, and keep discovery feel personal.</p>
+                      </div>
+                      <div className="glass-panel card-lift rounded-[2rem] p-5">
+                        <p className="section-kicker">Monetization</p>
+                        <h3 className="mt-3 text-xl font-semibold text-white">Affiliate rails and sponsored rows.</h3>
+                        <p className="mt-2 text-sm leading-6 text-white/55">Keep recommendations clean while blending in premium links to major OTT platforms.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-            <MovieRow
-              title="Because You Watched"
-              eyebrow="Personalized"
-              description="A stable recommendation rail that rewards prior intent and improves retention."
-              movies={becauseYouWatchedMovies}
-              onMovieClick={handleMovieClick}
-              onToggleList={toggleMyList}
-              myList={myList}
-            />
+                <MovieRow
+                  title="Continue Watching"
+                  eyebrow="Home base"
+                  description="Resume saved titles and unfinished trailers from where users left off."
+                  movies={continueWatchingMovies}
+                  onMovieClick={handleMovieClick}
+                  onToggleList={toggleMyList}
+                  myList={myList}
+                  isAuthenticated={isAuthenticated}
+                />
 
-            <MovieRow
-              title="Mood Picks"
-              eyebrow="AI-assisted"
-              description="Fast paths for the way people actually browse: by mood, time, and energy level."
-              movies={moodPicks}
-              onMovieClick={handleMovieClick}
-              onToggleList={toggleMyList}
-              myList={myList}
-            />
+                <MovieRow
+                  title="Because You Watched"
+                  eyebrow="Personalized"
+                  description="A stable recommendation rail that rewards prior intent and improves retention."
+                  movies={becauseYouWatchedMovies}
+                  onMovieClick={handleMovieClick}
+                  onToggleList={toggleMyList}
+                  myList={myList}
+                  isAuthenticated={isAuthenticated}
+                />
+
+                <MovieRow
+                  title="Mood Picks"
+                  eyebrow="AI-assisted"
+                  description="Fast paths for the way people actually browse: by mood, time, and energy level."
+                  movies={moodPicks}
+                  onMovieClick={handleMovieClick}
+                  onToggleList={toggleMyList}
+                  myList={myList}
+                  isAuthenticated={isAuthenticated}
+                />
+              </>
+            )}
             
             <div className="mt-6 relative z-30 space-y-8">
               {browseType !== 'all' && (
@@ -1149,6 +1324,7 @@ export default function App() {
                   isTV={section.isTV}
                   onToggleList={toggleMyList}
                   myList={myList}
+                  isAuthenticated={isAuthenticated}
                 />
               ))}
             </div>
@@ -1180,6 +1356,8 @@ export default function App() {
               onPreferenceSearch={handlePreferenceSearch}
               onNoResultsToChat={handleSmartFinderNoResults}
               myList={myList}
+              isAuthenticated={isAuthenticated}
+              onRequireAuth={openAuthGate}
             />
           </Suspense>
         )}
@@ -1304,6 +1482,28 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      <AnimatePresence mode="wait">
+        {showAuthGate && (
+          <AuthGateModal
+            key="auth-gate"
+            feature={pendingUnlockFeature}
+            copy={AUTH_GATE_COPY[pendingUnlockFeature] || AUTH_GATE_COPY.settings}
+            onLogin={() => {
+              setShowAuthGate(false);
+              setShowAuth(true);
+            }}
+            onClose={() => {
+              setShowAuthGate(false);
+              setPendingUnlockFeature(null);
+            }}
+            onBrowse={() => {
+              setShowAuthGate(false);
+              setPendingUnlockFeature(null);
+            }}
+          />
+        )}
+      </AnimatePresence>
+
       <footer className="mt-16 border-t border-white/10 bg-linear-to-b from-[#0f0f10] to-[#080809] px-4 py-12 md:px-12">
         <div className="mx-auto max-w-6xl">
           <div className="grid grid-cols-1 gap-10 md:grid-cols-4">
@@ -1345,10 +1545,10 @@ export default function App() {
             <div>
               <h4 className="mb-4 text-sm font-bold uppercase tracking-[0.18em] text-gray-200">Product</h4>
               <ul className="space-y-3 text-sm text-gray-400">
-                <li><button type="button" onClick={() => setShowSmartFinder(true)} className="hover:text-white cursor-pointer">Smart Finder</button></li>
+                <li><button type="button" onClick={openSmartFinder} className="hover:text-white cursor-pointer">Smart Finder</button></li>
                 <li><button type="button" onClick={() => setShowCompare(true)} className="hover:text-white cursor-pointer">Compare Titles</button></li>
                 <li><button type="button" onClick={() => openChat()} className="hover:text-white cursor-pointer">AI CineChat</button></li>
-                <li><button type="button" onClick={() => setShowMyList(true)} className="hover:text-white cursor-pointer">My Watchlist</button></li>
+                <li><button type="button" onClick={openMyList} className="hover:text-white cursor-pointer">My Watchlist</button></li>
               </ul>
             </div>
 

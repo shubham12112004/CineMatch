@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import MovieCard from './MovieCard';
 import SkeletonLoader from './SkeletonLoader';
 
-export default function MovieRow({ title, movies, onMovieClick, isTV = false, onToggleList, myList, loading = false, eyebrow, description }) {
+export default function MovieRow({ title, movies, onMovieClick, isTV = false, onToggleList, myList, loading = false, eyebrow, description, isAuthenticated = true, onRequireAuth }) {
   const rowRef = useRef(null);
 
   const scroll = (direction) => {
@@ -63,6 +63,8 @@ export default function MovieRow({ title, movies, onMovieClick, isTV = false, on
               isTV={isTV}
               onToggleList={onToggleList}
               isInList={myList?.some((m) => m.id === movie.id)}
+              isAuthenticated={isAuthenticated}
+              onRequireAuth={onRequireAuth}
             />
           ))}
         </div>

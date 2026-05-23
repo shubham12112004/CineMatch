@@ -122,7 +122,7 @@ export function createAuthRouter({
 
   const router = Router();
   const googleAuthEnabled = Boolean(googleClientId && googleClientSecret);
-  const callbackBaseUrl = String(appUrl || process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+  const callbackBaseUrl = String(process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
 
   if (googleAuthEnabled && !passport._strategies.google) {
 

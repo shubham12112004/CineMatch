@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Film, Play, Plus, Star, Check, ThumbsUp, ChevronDown } from 'lucide-react';
+import { Film, Play, Plus, Star, Check, ThumbsUp, ChevronDown, Lock } from 'lucide-react';
 import { POSTER_BASE_URL, getMovieVideos, getTVVideos, GENRE_MAP } from '../services/tmdb';
 
-export default function MovieCard({ movie, onClick, isTV: isTVProp = false, onToggleList, isInList }) {
+export default function MovieCard({ movie, onClick, isTV: isTVProp = false, onToggleList, isInList, isAuthenticated = true, onRequireAuth }) {
   const isTV = isTVProp || movie.media_type === 'tv' || !!movie.first_air_date;
   const [isHovered, setIsHovered] = useState(false);
   const [trailerKey, setTrailerKey] = useState(null);
@@ -53,8 +53,16 @@ export default function MovieCard({ movie, onClick, isTV: isTVProp = false, onTo
     if (action === 'play' || action === 'more') {
       onClick(movie, isTV ? 'tv' : 'movie');
     } else if (action === 'list') {
+      if (!isAuthenticated) {
+        onRequireAuth?.('watchlist');
+        return;
+      }
       onToggleList(movie);
     } else if (action === 'like') {
+      if (!isAuthenticated) {
+        onRequireAuth?.('watchlist');
+        return;
+      }
       setIsLiked((prev) => !prev);
     }
   };

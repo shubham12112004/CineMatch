@@ -138,7 +138,9 @@ const MOOD_KEYWORDS = [
 
 function safeParseJson(value, fallback) {
   try {
-    return JSON.parse(value);
+    const parsed = JSON.parse(value);
+    if (parsed === null || parsed === undefined) return fallback;
+    return parsed;
   } catch {
     return fallback;
   }
@@ -354,7 +356,7 @@ function buildSummaryLabel(intent) {
   return parts.length ? parts.join(' • ') : 'Smart match';
 }
 
-export default function SmartFinder({ onClose, onMovieClick, onToggleList, myList, onPreferenceSearch, onNoResultsToChat }) {
+export default function SmartFinder({ onClose, onMovieClick, onToggleList, myList, onPreferenceSearch, onNoResultsToChat, isAuthenticated = true, onRequireAuth }) {
   const [query, setQuery] = useState('');
   const [assistantLine, setAssistantLine] = useState('Tell me the vibe and I will narrow it down instantly.');
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
@@ -373,6 +375,12 @@ export default function SmartFinder({ onClose, onMovieClick, onToggleList, myLis
   const [featuredCollections, setFeaturedCollections] = useState([]);
   const requestIdRef = useRef(0);
   const recognitionRef = useRef(null);
+
+  const openTitle = (item) => {
+    if (typeof onMovieClick === 'function') {
+      onMovieClick(item, item.media_type || 'movie');
+    }
+  };
   const textareaRef = useRef(null);
 
   const placeholder = PLACEHOLDERS[placeholderIndex % PLACEHOLDERS.length];
@@ -386,7 +394,8 @@ export default function SmartFinder({ onClose, onMovieClick, onToggleList, myLis
   }, []);
 
   useEffect(() => {
-    setRecentSearches(safeParseJson(localStorage.getItem(RECENT_SEARCH_STORAGE_KEY), []));
+    const stored = safeParseJson(localStorage.getItem(RECENT_SEARCH_STORAGE_KEY), []);
+    setRecentSearches(Array.isArray(stored) ? stored : []);
   }, []);
 
   useEffect(() => {
@@ -545,7 +554,7 @@ export default function SmartFinder({ onClose, onMovieClick, onToggleList, myLis
 
   const saveRecentSearch = (value) => {
     const next = makeRecentSearchItems(value);
-    setRecentSearches(next);
+    setRecentSearches(Array.isArray(next) ? next : []);
   };
 
   const startVoiceSearch = () => {
@@ -895,7 +904,7 @@ export default function SmartFinder({ onClose, onMovieClick, onToggleList, myLis
               {heroRecommendations.map((item) => (
                 <button
                   key={`${item.media_type}-${item.id}`}
-                  onClick={() => handleMovieClick(item, item.media_type)}
+                  onClick={() => openTitle(item)}
                   className="group overflow-hidden rounded-[1.2rem] border border-white/10 bg-white/4 text-left shadow-[0_18px_50px_rgba(0,0,0,0.25)] transition hover:border-white/20"
                 >
                   <div className="aspect-2/3 bg-slate-900">
@@ -1008,7 +1017,7 @@ export default function SmartFinder({ onClose, onMovieClick, onToggleList, myLis
             {becauseYouWatched.length > 0 ? becauseYouWatched.slice(0, 4).map((item) => (
               <button
                 key={`${item.media_type}-${item.id}`}
-                onClick={() => handleMovieClick(item, item.media_type)}
+                onClick={() => openTitle(item)}
                 className="flex w-full items-center gap-3 rounded-2xl border border-white/8 bg-black/10 p-2 text-left transition hover:bg-white/8"
               >
                 <div className="h-14 w-10 overflow-hidden rounded-xl bg-slate-900">
@@ -1051,7 +1060,7 @@ export default function SmartFinder({ onClose, onMovieClick, onToggleList, myLis
             <p className="mt-2 text-sm leading-6 text-white/60">{collection.subtitle}</p>
             <div className="mt-4 grid grid-cols-3 gap-2">
               {collection.items.slice(0, 3).map((item) => (
-                <button key={`${collection.title}-${item.id}`} onClick={() => handleMovieClick(item, item.media_type || 'movie')} className="overflow-hidden rounded-2xl border border-white/8 bg-black/10">
+                <button key={`${collection.title}-${item.id}`} onClick={() => openTitle(item)} className="overflow-hidden rounded-2xl border border-white/8 bg-black/10">
                   <div className="aspect-2/3">
                     {item.poster_path ? <img src={`${POSTER_BASE_URL}${item.poster_path}`} alt={item.title || item.name} className="h-full w-full object-cover" loading="lazy" /> : null}
                   </div>
@@ -1358,6 +1367,8 @@ export default function SmartFinder({ onClose, onMovieClick, onToggleList, myLis
                     isTV={item.media_type === 'tv'}
                     onToggleList={onToggleList}
                     isInList={myList?.some((m) => m.id === item.id)}
+                    isAuthenticated={isAuthenticated}
+                    onRequireAuth={onRequireAuth}
                   />
                 ))}
               </div>

@@ -19,6 +19,7 @@ import {
   PlaySquare,
   WandSparkles,
   ChevronDown,
+  Lock,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { fetchFromTMDB } from '../services/tmdb';
@@ -44,6 +45,7 @@ export default function Navbar({
   selectedLanguage,
   onLanguageChange,
   currentUser,
+  isAuthenticated = true,
   onLogout,
   onLogin,
   notifications = [],
@@ -213,6 +215,7 @@ export default function Navbar({
     { label: 'Recommendations', icon: WandSparkles, action: onPreferenceSearch, tone: 'text-pink-200' },
     { label: 'Settings', icon: MoonStar, action: () => onSettings?.(), tone: 'text-slate-200' },
   ];
+  const lockedMoreActions = new Set(['Smart Finder', 'AI Chat', 'Recommendations', 'Settings']);
 
   const timeAgo = (isoDate) => {
     const time = new Date(isoDate).getTime();
@@ -342,11 +345,11 @@ export default function Navbar({
                           className="flex items-center gap-3 rounded-2xl border border-white/6 bg-white/[0.03] px-4 py-3 text-left transition-all hover:border-white/12 hover:bg-white/[0.06]"
                         >
                           <span className={`flex h-10 w-10 items-center justify-center rounded-2xl bg-white/5 ${tone}`}>
-                            <Icon size={18} />
+                            {lockedMoreActions.has(label) && !isAuthenticated ? <Lock size={16} /> : <Icon size={18} />}
                           </span>
                           <span>
                             <span className="block text-sm font-semibold text-white">{label}</span>
-                            <span className="block text-xs text-white/45">Open the modal or assistant</span>
+                            <span className="block text-xs text-white/45">{lockedMoreActions.has(label) && !isAuthenticated ? 'Sign in required' : 'Open the modal or assistant'}</span>
                           </span>
                         </button>
                       ))}
